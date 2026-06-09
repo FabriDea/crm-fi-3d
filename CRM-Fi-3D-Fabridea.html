@@ -1308,7 +1308,89 @@ function renderOrders(){
   if(!orders.length){$('orderTable').innerHTML=`<div class="empty"><div class="ei">📦</div><p>${orderFilter==='all'&&!q?'Sin pedidos.<br>Ve a la <strong>Calculadora</strong> y guarda tu primer pedido.':'Sin pedidos con este filtro.'}</p></div>`;return;}
   $('orderTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Pieza</th><th>Cliente</th><th>Fecha</th><th>Uds</th><th>Total</th><th>Estado</th><th>Docs</th><th></th></tr></thead><tbody>${orders.map(o=>{const s=STATUS_CFG[o.status]||{icon:'?',label:o.status,color:'var(--muted)'};return`<tr><td><span class="code-badge">${o.code||'—'}</span></td><td class="tdn">${o.pieceName}</td><td>${o.client||''}${o.apellidos?' '+o.apellidos:''}</td><td>${fmtDate(o.date)}</td><td>${o.qty||1}</td><td style="color:var(--a2);font-weight:600">${fmt(o.totalOrder||0)}</td><td><select style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:${s.color};font-size:10px;padding:3px 5px;cursor:pointer;font-family:'DM Mono',monospace;max-width:140px;" onchange="changeOrderStatus('${o.id}',this)">${Object.entries(STATUS_CFG).map(([k,v])=>`<option value="${k}" ${o.status===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}</select></td><td style="display:flex;gap:3px;"><button class="btn btn-orange btn-sm btn-icon" onclick="genDocForOrder('${o.id}','budget')" title="Presupuesto">📄</button><button class="btn btn-blue btn-sm btn-icon" onclick="genDocForOrder('${o.id}','invoice')" title="Factura">🧾</button></td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="openEditOrder('${o.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteOrder('${o.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;
 }
-async function genDocForOrder(id,type){const o=window._data.orders.find(x=>x.id===id);if(!o)return;const existing=type==='budget'?o.budgetNum:o.invoiceNum;let docNum=existing;if(!existing){docNum=await getNextCode(type);const upd=type==='budget'?{budgetNum:docNum}:{invoiceNum:docNum};if(window.dbOps)await window.dbOps.updateOrder(id,upd);o[type==='budget'?'budgetNum':'invoiceNum']=docNum;}generatePDF(type,{...o,[type==='budget'?'budgetNum':'invoiceNum']:docNum});}
+async function genDocForOrder(id,type){
+  const o=window._data.orders.find(x=>x.id===id);if(!o)return;
+  const existing=type==='budget'?o.budgetNum:o.invoiceNum;
+  const label=type==='budget'?'presupuesto':'factura';
+  const prefix=type==='budget'?'PRES-':'FAC-';
+
+  if(existing){
+    // Ya tiene número — preguntar si regenerar o crear nuevo
+    const choice=await showDocModal(type,o,existing);
+    if(!choice)return;
+    if(choice==='reprint'){
+      generatePDF(type,{...o});
+    } else if(choice==='new'){
+      const docNum=await getNextCode(type);
+      const upd=type==='budget'?{budgetNum:docNum}:{invoiceNum:docNum};
+      if(window.dbOps)await window.dbOps.updateOrder(id,upd);
+      Object.assign(o,upd);
+      generatePDF(type,{...o});
+      toast(`✓ ${label.charAt(0).toUpperCase()+label.slice(1)} ${docNum} emitida`,'green');
+    }
+  } else {
+    // No tiene número — confirmar antes de asignar
+    const confirmed=await showDocModal(type,o,null);
+    if(!confirmed)return;
+    const docNum=await getNextCode(type);
+    const upd=type==='budget'?{budgetNum:docNum}:{invoiceNum:docNum};
+    if(window.dbOps)await window.dbOps.updateOrder(id,upd);
+    Object.assign(o,upd);
+    generatePDF(type,{...o});
+    toast(`✓ ${label.charAt(0).toUpperCase()+label.slice(1)} ${docNum} emitida`,'green');
+  }
+}
+
+function showDocModal(type,order,existing){
+  return new Promise(resolve=>{
+    const label=type==='budget'?'Presupuesto':'Factura';
+    const icon=type==='budget'?'📄':'🧾';
+    const s=window._data.settings||{};
+    const nextNum=(type==='budget'?(parseInt(s.nextBudget)||1):(parseInt(s.nextInvoice)||1));
+    const nextPrefix=type==='budget'?'PRES-':'FAC-';
+    const nextCode=nextPrefix+String(nextNum).padStart(5,'0');
+
+    // Remove any existing doc modal
+    const old=document.getElementById('_docConfirmModal');if(old)old.remove();
+
+    const div=document.createElement('div');
+    div.id='_docConfirmModal';
+    div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);z-index:600;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+    if(existing){
+      div.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;max-width:440px;width:100%;">
+        <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;margin-bottom:6px;">${icon} ${label} ya emitida</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Este pedido ya tiene asignado el número <strong style="color:var(--a3)">${existing}</strong>. ¿Qué quieres hacer?</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button onclick="document.getElementById('_docConfirmModal').remove();arguments[0].stopPropagation();" id="_btn_reprint" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;padding:10px 14px;cursor:pointer;text-align:left;">🖨 Reimprimir ${existing} <span style="color:var(--muted);font-size:10px;display:block;margin-top:2px;">No se asigna número nuevo</span></button>
+          <button onclick="document.getElementById('_docConfirmModal').remove();arguments[0].stopPropagation();" id="_btn_new" style="background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.2);border-radius:8px;color:var(--a2);font-family:'DM Mono',monospace;font-size:11px;padding:10px 14px;cursor:pointer;text-align:left;">📝 Emitir nueva ${nextCode} <span style="color:var(--muted);font-size:10px;display:block;margin-top:2px;">Se asignará número nuevo y consumirá ${nextCode}</span></button>
+          <button onclick="document.getElementById('_docConfirmModal').remove();" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;padding:8px 14px;cursor:pointer;">Cancelar</button>
+        </div>
+      </div>`;
+      div.querySelector('#_btn_reprint').addEventListener('click',()=>resolve('reprint'));
+      div.querySelector('#_btn_new').addEventListener('click',()=>resolve('new'));
+      div.addEventListener('click',e=>{if(e.target===div){div.remove();resolve(null);}});
+    } else {
+      div.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;max-width:440px;width:100%;">
+        <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;margin-bottom:6px;">${icon} Emitir ${label}</div>
+        <div style="font-size:12px;color:var(--soft);margin-bottom:4px;">Pieza: <strong style="color:var(--text)">${order.pieceName}</strong></div>
+        <div style="font-size:12px;color:var(--soft);margin-bottom:16px;">Cliente: <strong style="color:var(--text)">${order.client} ${order.apellidos||''}</strong></div>
+        <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Se asignará el número</div>
+          <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--a3);">${nextCode}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">⚠️ Este número no se puede recuperar si cancelas después.</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="document.getElementById('_docConfirmModal').remove();" style="flex:1;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;padding:10px;cursor:pointer;">Cancelar</button>
+          <button id="_btn_confirm" style="flex:2;background:linear-gradient(135deg,#ea6c00,#ff6b35);border:none;border-radius:8px;color:#fff;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;padding:10px;cursor:pointer;">${icon} Confirmar y emitir ${nextCode}</button>
+        </div>
+      </div>`;
+      div.querySelector('#_btn_confirm').addEventListener('click',()=>{div.remove();resolve('confirm');});
+      div.addEventListener('click',e=>{if(e.target===div){div.remove();resolve(null);}});
+    }
+    document.body.appendChild(div);
+  });
+}
 function openEditOrder(id){const o=window._data.orders.find(x=>x.id===id);if(!o)return;$('eo-id').value=id;$('eo-code-display').textContent=o.code||'';$('eo-piece').value=o.pieceName||'';$('eo-status').value=o.status||'solicitud';$('eo-client').value=o.client||'';$('eo-apellidos').value=o.apellidos||'';$('eo-phone').value=o.phone||'';$('eo-email').value=o.email||'';$('eo-qty').value=o.qty||1;$('eo-date').value=o.date||today();$('eo-cost').value=o.costPerPiece||0;$('eo-price').value=o.pricePerPiece||0;$('eo-budget').value=o.budgetNum||'';$('eo-invoice').value=o.invoiceNum||'';$('eo-notes').value=o.notes||'';$('editOrderModal').classList.add('open');}
 async function updateOrder(){const id=$('eo-id').value;if(!id)return;const pn=$('eo-piece').value.trim();if(!pn){toast('Nombre obligatorio','red');return;}const qty=Math.max(parseInt($('eo-qty').value)||1,1);const price=parseFloat($('eo-price').value)||0;const data={pieceName:pn,client:$('eo-client').value.trim(),apellidos:$('eo-apellidos').value.trim(),phone:$('eo-phone').value.trim(),email:$('eo-email').value.trim(),qty,date:$('eo-date').value,status:$('eo-status').value,budgetNum:$('eo-budget').value.trim(),invoiceNum:$('eo-invoice').value.trim(),costPerPiece:parseFloat($('eo-cost').value)||0,pricePerPiece:price,totalOrder:fmtR(price*qty),notes:$('eo-notes').value.trim()};if(window.dbOps)await window.dbOps.updateOrder(id,data);closeModal('editOrderModal');toast('✓ Pedido actualizado','green');}
 async function generateDocFromEdit(type){const id=$('eo-id').value;if(!id)return;await updateOrder();setTimeout(()=>genDocForOrder(id,type),600);}
