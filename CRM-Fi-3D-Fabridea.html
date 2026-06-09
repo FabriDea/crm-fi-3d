@@ -723,6 +723,13 @@ tr:hover td{background:var(--s2);}
         <div style="font-size:11px;color:var(--muted)">📎 Pulsa para subir</div>
         <div class="file-name" id="fileName"></div>
       </div>
+      <div id="uploadProgressContainer" style="display:none;margin-top:6px;">
+        <div style="background:var(--border);border-radius:100px;height:6px;overflow:hidden;">
+          <div id="uploadProgressBar" style="height:100%;width:0%;background:var(--accent);transition:width .3s;border-radius:100px;"></div>
+        </div>
+        <div id="uploadProgressLabel" style="font-size:10px;color:var(--muted);margin-top:3px;">Subiendo…</div>
+      </div>
+      <div id="fileStorageInfo" style="display:none;margin-top:6px;font-size:10px;color:var(--accent);">✓ Archivo guardado en la nube</div>
     </div>
     <div class="field"><label>Notas</label><textarea id="m-notes" placeholder="Color, personalización…" style="min-height:72px;"></textarea></div>
   </div>
@@ -778,6 +785,21 @@ tr:hover td{background:var(--s2);}
     <div class="field"><label>Nº Factura</label><input type="text" id="eo-invoice"></div>
   </div>
   <div class="field"><label>Notas</label><textarea id="eo-notes"></textarea></div>
+  <div id="eo-file-section" style="margin-top:8px;padding:10px;background:var(--s2);border-radius:8px;border:1px solid var(--border);">
+    <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;">📁 ARCHIVO DE DISEÑO</div>
+    <div id="eo-file-current" style="font-size:11px;color:var(--soft);margin-bottom:6px;"></div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('eo-file-input').click()">📎 Cambiar archivo</button>
+      <input type="file" id="eo-file-input" style="display:none" accept=".stl,.obj,.3mf,.step,.stp,.svg,.pdf" onchange="handleEditFileSelect(this)">
+      <span id="eo-file-new-name" style="font-size:11px;color:var(--accent);"></span>
+    </div>
+    <div id="eo-upload-progress" style="display:none;margin-top:6px;">
+      <div style="background:var(--border);border-radius:100px;height:5px;overflow:hidden;">
+        <div id="eo-upload-bar" style="height:100%;width:0%;background:var(--accent);transition:width .3s;border-radius:100px;"></div>
+      </div>
+      <div id="eo-upload-label" style="font-size:10px;color:var(--muted);margin-top:2px;">Subiendo…</div>
+    </div>
+  </div>
   <div class="mfooter">
     <button class="btn btn-ghost btn-sm" onclick="closeModal('editOrderModal')">Cancelar</button>
     <button class="btn btn-orange btn-sm" onclick="generateDocFromEdit('budget')">📄 Presupuesto</button>
@@ -882,6 +904,7 @@ tr:hover td{background:var(--s2);}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
 import { getFirestore, collection, doc, addDoc, setDoc, deleteDoc, getDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAro0Bs1HmVRJ49DVu3Rikrf3tC_3qK_c0",
@@ -893,6 +916,37 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const storage = getStorage(app);
+
+/* ════ FIREBASE STORAGE — SUBIDA DE ARCHIVOS ════ */
+window.uploadFileToStorage = async function(file, orderId, onProgress) {
+  if (!file) return null;
+  const path = `designs/${orderId}/${Date.now()}_${file.name}`;
+  const storageRef = ref(storage, path);
+  return new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(storageRef, file);
+    task.on('state_changed',
+      snap => {
+        const pct = Math.round(snap.bytesTransferred / snap.totalBytes * 100);
+        if (onProgress) { onProgress(pct); return; }
+        const bar = document.getElementById('uploadProgressBar');
+        const lbl = document.getElementById('uploadProgressLabel');
+        if (bar) bar.style.width = pct + '%';
+        if (lbl) lbl.textContent = `Subiendo… ${pct}%`;
+      },
+      err => reject(err),
+      async () => {
+        const url = await getDownloadURL(task.snapshot.ref);
+        resolve({ url, path, name: file.name, size: file.size });
+      }
+    );
+  });
+};
+
+window.deleteFileFromStorage = async function(filePath) {
+  if (!filePath) return;
+  try { await deleteObject(ref(storage, filePath)); } catch(e) { console.warn('Delete file:', e); }
+};
 
 function setSyncStatus(state){
   const dot=document.getElementById('syncDot'),txt=document.getElementById('syncTxt');
@@ -1322,8 +1376,36 @@ async function buildOrderObject(){
   if(!$('m-clientSel').value&&clientName){const exists=window._data.clients.find(c=>c.name.toLowerCase()===clientName.toLowerCase());if(!exists&&window.dbOps){const cc=await getNextCode('client');await window.dbOps.addClient({name:clientName,apellidos:$('m-apellidos').value.trim(),phone,email:$('m-email').value.trim(),notes:'',code:cc,status:'activo'});}}
   return{pieceName:pn,code,client:clientName,apellidos:$('m-apellidos').value.trim(),phone,email:$('m-email').value.trim(),qty:q,status:$('m-status').value,date:$('m-date').value,notes:$('m-notes').value.trim(),fileName:selectedFile?selectedFile.name:'',costPerPiece:fmtR(C.total),pricePerPiece:fmtR(C.sp),priceWithFee:fmtR(C.spf),totalOrder:fmtR(C.spf*q),margin:C.mg,platformFee:C.pf,budgetNum:'',invoiceNum:'',breakdown:{fc:fmtR(C.fc),ec:fmtR(C.ec),dc:fmtR(C.dc),mc:fmtR(C.mc),lc:fmtR(C.lc),pk:fmtR(C.pk),sh:fmtR(C.sh),cc:fmtR(C.cc)}};
 }
-async function saveOrder(){const order=await buildOrderObject();if(!order)return;if(window.dbOps)await window.dbOps.addOrder(order);closeModal('saveModal');clearOrderForm();toast(`✓ Pedido ${order.code} guardado`,'purple');}
-async function saveOrderAndGenerate(type){const order=await buildOrderObject();if(!order)return;const docCode=await getNextCode(type);if(type==='budget')order.budgetNum=docCode;else order.invoiceNum=docCode;if(window.dbOps)await window.dbOps.addOrder(order);closeModal('saveModal');clearOrderForm();toast(`✓ Pedido ${order.code} guardado`,'purple');setTimeout(()=>generatePDF(type,order),500);}
+async function saveOrder(){
+  const order=await buildOrderObject();if(!order)return;
+  let docRef;
+  if(window.dbOps) docRef=await window.dbOps.addOrder(order);
+  // Subir archivo a Storage si hay uno seleccionado
+  if(selectedFile && docRef && window.uploadFileToStorage){
+    try{
+      const pc=$('uploadProgressContainer');if(pc)pc.style.display='block';
+      const fileData=await window.uploadFileToStorage(selectedFile, docRef.id);
+      await window.dbOps.updateOrder(docRef.id,{fileUrl:fileData.url,filePath:fileData.path,fileName:fileData.name,fileSize:fileData.size});
+      const fi=$('fileStorageInfo');if(fi)fi.style.display='block';
+    }catch(e){toast('⚠️ Pedido guardado pero el archivo no se subió','red');}
+  }
+  closeModal('saveModal');clearOrderForm();toast(`✓ Pedido ${order.code} guardado`,'purple');
+}
+async function saveOrderAndGenerate(type){
+  const order=await buildOrderObject();if(!order)return;
+  const docCode=await getNextCode(type);
+  if(type==='budget')order.budgetNum=docCode;else order.invoiceNum=docCode;
+  let docRef;
+  if(window.dbOps) docRef=await window.dbOps.addOrder(order);
+  if(selectedFile && docRef && window.uploadFileToStorage){
+    try{
+      const pc=$('uploadProgressContainer');if(pc)pc.style.display='block';
+      const fileData=await window.uploadFileToStorage(selectedFile, docRef.id);
+      await window.dbOps.updateOrder(docRef.id,{fileUrl:fileData.url,filePath:fileData.path,fileName:fileData.name,fileSize:fileData.size});
+    }catch(e){console.warn('File upload error:',e);}
+  }
+  closeModal('saveModal');clearOrderForm();toast(`✓ Pedido ${order.code} guardado`,'purple');setTimeout(()=>generatePDF(type,order),500);
+}
 function clearOrderForm(){['m-client','m-apellidos','m-phone','m-email','m-notes'].forEach(f=>{if($(f)){$(f).value='';$(f).classList.remove('error');}});$('m-qty').value=1;selectedFile=null;}
 
 /* ════ ORDERS ════ */
@@ -1335,7 +1417,7 @@ function renderOrders(){
   if(orderFilter!=='all')orders=orders.filter(o=>o.status===orderFilter);
   if(q)orders=orders.filter(o=>(o.pieceName+o.client+(o.code||'')+(o.notes||'')).toLowerCase().includes(q));
   if(!orders.length){$('orderTable').innerHTML=`<div class="empty"><div class="ei">📦</div><p>${orderFilter==='all'&&!q?'Sin pedidos.<br>Ve a la <strong>Calculadora</strong> y guarda tu primer pedido.':'Sin pedidos con este filtro.'}</p></div>`;return;}
-  $('orderTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Pieza</th><th>Cliente</th><th>Fecha</th><th>Uds</th><th>Total</th><th>Estado</th><th>Docs</th><th></th></tr></thead><tbody>${orders.map(o=>{const s=STATUS_CFG[o.status]||{icon:'?',label:o.status,color:'var(--muted)'};return`<tr><td><span class="code-badge">${o.code||'—'}</span></td><td class="tdn">${o.pieceName}</td><td>${o.client||''}${o.apellidos?' '+o.apellidos:''}</td><td>${fmtDate(o.date)}</td><td>${o.qty||1}</td><td style="color:var(--a2);font-weight:600">${fmt(o.totalOrder||0)}</td><td><select style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:${s.color};font-size:10px;padding:3px 5px;cursor:pointer;font-family:'DM Mono',monospace;max-width:140px;" onchange="changeOrderStatus('${o.id}',this)">${Object.entries(STATUS_CFG).map(([k,v])=>`<option value="${k}" ${o.status===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}</select></td><td style="display:flex;gap:3px;"><button class="btn btn-orange btn-sm btn-icon" onclick="genDocForOrder('${o.id}','budget')" title="Presupuesto">📄</button><button class="btn btn-blue btn-sm btn-icon" onclick="genDocForOrder('${o.id}','invoice')" title="Factura">🧾</button></td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="openEditOrder('${o.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteOrder('${o.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;
+  $('orderTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Pieza</th><th>Cliente</th><th>Fecha</th><th>Uds</th><th>Total</th><th>Estado</th><th>Docs</th><th></th></tr></thead><tbody>${orders.map(o=>{const s=STATUS_CFG[o.status]||{icon:'?',label:o.status,color:'var(--muted)'};const fileBtn=o.fileUrl?`<a href="${o.fileUrl}" target="_blank" class="btn btn-ghost btn-sm btn-icon" title="${o.fileName||'Archivo'}">📁</a>`:'';return`<tr><td><span class="code-badge">${o.code||'—'}</span></td><td class="tdn">${o.pieceName}</td><td>${o.client||''}${o.apellidos?' '+o.apellidos:''}</td><td>${fmtDate(o.date)}</td><td>${o.qty||1}</td><td style="color:var(--a2);font-weight:600">${fmt(o.totalOrder||0)}</td><td><select style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:${s.color};font-size:10px;padding:3px 5px;cursor:pointer;font-family:'DM Mono',monospace;max-width:140px;" onchange="changeOrderStatus('${o.id}',this)">${Object.entries(STATUS_CFG).map(([k,v])=>`<option value="${k}" ${o.status===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}</select></td><td style="display:flex;gap:3px;">${fileBtn}<button class="btn btn-orange btn-sm btn-icon" onclick="genDocForOrder('${o.id}','budget')" title="Presupuesto">📄</button><button class="btn btn-blue btn-sm btn-icon" onclick="genDocForOrder('${o.id}','invoice')" title="Factura">🧾</button></td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="openEditOrder('${o.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteOrder('${o.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;
 }
 async function genDocForOrder(id,type){
   const o=window._data.orders.find(x=>x.id===id);if(!o)return;
@@ -1420,8 +1502,31 @@ function showDocModal(type,order,existing){
     document.body.appendChild(div);
   });
 }
-function openEditOrder(id){const o=window._data.orders.find(x=>x.id===id);if(!o)return;$('eo-id').value=id;$('eo-code-display').textContent=o.code||'';$('eo-piece').value=o.pieceName||'';$('eo-status').value=o.status||'solicitud';$('eo-client').value=o.client||'';$('eo-apellidos').value=o.apellidos||'';$('eo-phone').value=o.phone||'';$('eo-email').value=o.email||'';$('eo-qty').value=o.qty||1;$('eo-date').value=o.date||today();$('eo-cost').value=o.costPerPiece||0;$('eo-price').value=o.pricePerPiece||0;$('eo-budget').value=o.budgetNum||'';$('eo-invoice').value=o.invoiceNum||'';$('eo-notes').value=o.notes||'';$('editOrderModal').classList.add('open');}
-async function updateOrder(){const id=$('eo-id').value;if(!id)return;const pn=$('eo-piece').value.trim();if(!pn){toast('Nombre obligatorio','red');return;}const qty=Math.max(parseInt($('eo-qty').value)||1,1);const price=parseFloat($('eo-price').value)||0;const data={pieceName:pn,client:$('eo-client').value.trim(),apellidos:$('eo-apellidos').value.trim(),phone:$('eo-phone').value.trim(),email:$('eo-email').value.trim(),qty,date:$('eo-date').value,status:$('eo-status').value,budgetNum:$('eo-budget').value.trim(),invoiceNum:$('eo-invoice').value.trim(),costPerPiece:parseFloat($('eo-cost').value)||0,pricePerPiece:price,totalOrder:fmtR(price*qty),notes:$('eo-notes').value.trim()};if(window.dbOps)await window.dbOps.updateOrder(id,data);closeModal('editOrderModal');toast('✓ Pedido actualizado','green');}
+function openEditOrder(id){const o=window._data.orders.find(x=>x.id===id);if(!o)return;$('eo-id').value=id;$('eo-code-display').textContent=o.code||'';$('eo-piece').value=o.pieceName||'';$('eo-status').value=o.status||'solicitud';$('eo-client').value=o.client||'';$('eo-apellidos').value=o.apellidos||'';$('eo-phone').value=o.phone||'';$('eo-email').value=o.email||'';$('eo-qty').value=o.qty||1;$('eo-date').value=o.date||today();$('eo-cost').value=o.costPerPiece||0;$('eo-price').value=o.pricePerPiece||0;$('eo-budget').value=o.budgetNum||'';$('eo-invoice').value=o.invoiceNum||'';$('eo-notes').value=o.notes||'';
+  // Mostrar archivo actual si existe
+  const fc=$('eo-file-current');
+  if(fc){if(o.fileUrl&&o.fileName){fc.innerHTML=`📁 <a href="${o.fileUrl}" target="_blank" style="color:var(--accent)">${o.fileName}</a> <span style="color:var(--muted)">(guardado en la nube)</span>`;}else{fc.textContent='Sin archivo adjunto.';}}
+  window._editFile=null;$('eo-file-new-name').textContent='';$('eo-upload-progress').style.display='none';
+  $('editOrderModal').classList.add('open');}
+
+let _editSelectedFile=null;
+function handleEditFileSelect(input){_editSelectedFile=input.files[0];if(_editSelectedFile){$('eo-file-new-name').textContent=`📎 ${_editSelectedFile.name}`;}}
+
+async function updateOrder(){const id=$('eo-id').value;if(!id)return;const pn=$('eo-piece').value.trim();if(!pn){toast('Nombre obligatorio','red');return;}const qty=Math.max(parseInt($('eo-qty').value)||1,1);const price=parseFloat($('eo-price').value)||0;const data={pieceName:pn,client:$('eo-client').value.trim(),apellidos:$('eo-apellidos').value.trim(),phone:$('eo-phone').value.trim(),email:$('eo-email').value.trim(),qty,date:$('eo-date').value,status:$('eo-status').value,budgetNum:$('eo-budget').value.trim(),invoiceNum:$('eo-invoice').value.trim(),costPerPiece:parseFloat($('eo-cost').value)||0,pricePerPiece:price,totalOrder:fmtR(price*qty),notes:$('eo-notes').value.trim()};
+  if(window.dbOps)await window.dbOps.updateOrder(id,data);
+  // Subir nuevo archivo si se seleccionó uno
+  if(_editSelectedFile && window.uploadFileToStorage){
+    try{
+      $('eo-upload-progress').style.display='block';
+      const task=await window.uploadFileToStorage(_editSelectedFile,id,(pct)=>{
+        $('eo-upload-bar').style.width=pct+'%';
+        $('eo-upload-label').textContent=`Subiendo… ${pct}%`;
+      });
+      await window.dbOps.updateOrder(id,{fileUrl:task.url,filePath:task.path,fileName:task.name,fileSize:task.size});
+      _editSelectedFile=null;
+    }catch(e){toast('⚠️ Datos guardados pero el archivo no se subió','red');}
+  }
+  closeModal('editOrderModal');toast('✓ Pedido actualizado','green');}
 async function generateDocFromEdit(type){const id=$('eo-id').value;if(!id)return;await updateOrder();setTimeout(()=>genDocForOrder(id,type),600);}
 async function changeOrderStatus(id,sel){if(window.dbOps)await window.dbOps.updateOrder(id,{status:sel.value});sel.style.color=STATUS_CFG[sel.value]?.color||'var(--muted)';toast('Estado actualizado');}
 async function deleteOrder(id){if(!confirm('¿Eliminar este pedido?'))return;if(window.dbOps)await window.dbOps.deleteOrder(id);toast('Pedido eliminado','red');}
