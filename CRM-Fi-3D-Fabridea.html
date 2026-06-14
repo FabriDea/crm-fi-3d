@@ -427,6 +427,8 @@ tr:hover td{background:var(--s2);}
           <div class="field" id="f-filamentWeight"><label>Peso usado</label><div class="iw"><input type="number" id="filamentWeight" value="50" min="0" step="1" class="hu" oninput="calc()"><span class="unit">g</span></div></div>
           <div class="field" id="f-filamentType"><label>Material</label>
             <select id="filamentType" onchange="handleFilamentChange()">
+              <optgroup label="📦 Mi inventario" id="filamentInventoryGroup"></optgroup>
+              <optgroup label="Genérico">
               <option value="pla">PLA</option><option value="pla+" selected>PLA+</option>
               <option value="petg">PETG</option><option value="abs">ABS</option>
               <option value="asa">ASA</option><option value="tpu">TPU (flexible)</option>
@@ -436,6 +438,7 @@ tr:hover td{background:var(--s2);}
               <option value="bambu-abs">Bambu Lab ABS</option>
               <option value="bambu-support">Bambu Lab Support</option>
               <option value="custom">Personalizado…</option>
+              </optgroup>
             </select>
           </div>
           <div class="field" id="f-customFilament" style="display:none"><label>Nombre material</label><input type="text" id="customFilamentName" placeholder="Ej: Nylon CF…" oninput="calc()"></div>
@@ -844,8 +847,8 @@ tr:hover td{background:var(--s2);}
   </div>
   <div id="mm-dynamic-fields"></div>
   <div class="fr">
-    <div class="field"><label>Stock actual</label><div class="iw"><input type="number" id="mm-stock" value="1" min="0" step="1" class="hu"><span class="unit">uds</span></div></div>
-    <div class="field"><label>Stock mínimo</label><div class="iw"><input type="number" id="mm-min" value="1" min="0" step="1" class="hu"><span class="unit">uds</span></div></div>
+    <div class="field"><label>Stock actual</label><div class="iw"><input type="number" id="mm-stock" value="1" min="0" step="1" class="hu"><span class="unit" id="mm-stock-unit">uds</span></div></div>
+    <div class="field"><label>Stock mínimo</label><div class="iw"><input type="number" id="mm-min" value="1" min="0" step="1" class="hu"><span class="unit" id="mm-min-unit">uds</span></div></div>
   </div>
   <div class="field"><label>Proveedor</label><input type="text" id="mm-supplier" placeholder="Amazon, Bambu Lab…"></div>
   <div class="mfooter">
@@ -894,6 +897,15 @@ tr:hover td{background:var(--s2);}
     <button class="btn btn-ghost" onclick="closeModal('clientDetailModal')">Cerrar</button>
     <button class="btn btn-ghost btn-sm" id="cdm-edit">✏️ Editar</button>
     <button class="btn btn-danger btn-sm" id="cdm-del">🗑 Eliminar</button>
+  </div>
+</div>
+</div>
+<div class="mo" id="orderDetailModal">
+<div class="modal" style="max-width:520px;">
+  <div class="mhd"><div class="mtitle" id="odm-title">ℹ️ Detalles</div><button class="mclose" onclick="closeModal('orderDetailModal')">✕</button></div>
+  <div id="odm-body"></div>
+  <div class="mfooter">
+    <button class="btn btn-ghost" onclick="closeModal('orderDetailModal')">Cerrar</button>
   </div>
 </div>
 </div>
@@ -967,7 +979,7 @@ function initListeners(){
     updateBadges();
   },()=>setSyncStatus('err'));
   onSnapshot(collection(db,'clients'),snap=>{window._data.clients=snap.docs.map(d=>({id:d.id,...d.data()}));if(document.getElementById('page-clients').classList.contains('active'))renderClients();updateBadges();});
-  onSnapshot(collection(db,'materials'),snap=>{window._data.materials=snap.docs.map(d=>({id:d.id,...d.data()}));if(document.getElementById('page-materials').classList.contains('active'))renderMaterials();updateBadges();});
+  onSnapshot(collection(db,'materials'),snap=>{window._data.materials=snap.docs.map(d=>({id:d.id,...d.data()}));if(document.getElementById('page-materials').classList.contains('active'))renderMaterials();populateFilamentInventory();updateBadges();});
   onSnapshot(query(collection(db,'expenses'),orderBy('createdAt','desc')),snap=>{window._data.expenses=snap.docs.map(d=>({id:d.id,...d.data()}));if(document.getElementById('page-finance').classList.contains('active'))renderFinance();});
   onSnapshot(doc(db,'settings','main'),snap=>{
     if(snap.exists()){
@@ -1044,6 +1056,16 @@ const STATUS_CFG={
   cancelado:{icon:'❌',label:'Cancelado',color:'var(--red)'},
 };
 const PRODUCTION_STATUSES=['impresion','postproceso','calidad','listo','enviado','entregado','facturado'];
+async function deductFilamentStock(order){
+  if(!order||order.stockDeducted)return false;
+  const fu=order.filamentUsed;
+  if(!fu||!fu.materialId||!fu.totalGrams)return false;
+  const mat=(window._data.materials||[]).find(m=>m.id===fu.materialId);
+  if(!mat)return false;
+  const newStock=Math.max((mat.stock||0)-fu.totalGrams,0);
+  if(window.dbOps)await window.dbOps.updateMaterial(mat.id,{stock:fmtR(newStock)});
+  return true;
+}
 
 /* ════ CORRELATIVE CODES ════ */
 async function getNextCode(type){
@@ -1122,7 +1144,7 @@ function renderDashboard(){
   $('d-status-bars').innerHTML=show.length?show.map(k=>{const c=STATUS_CFG[k];return`<div class="cbh"><span class="cbhl">${c.icon} ${c.label}</span><div class="cbht"><div class="cbhf" style="width:${(sc[k]/tot*100).toFixed(0)}%;background:${c.color}"></div></div><span class="cbhv">${sc[k]}</span></div>`;}).join(''):'<p class="hint">Sin pedidos aún.</p>';
   $('d-recent').innerHTML=orders.slice(0,5).map(o=>{const s=STATUS_CFG[o.status]||{icon:'?'};return`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);"><div><div style="font-size:12px;color:var(--text)">${o.pieceName}</div><div style="font-size:10px;color:var(--muted)">${o.client||''} · ${fmtDate(o.date)}</div></div><span style="font-size:16px">${s.icon}</span></div>`;}).join('')||'<p class="hint">Sin pedidos.</p>';
   const low=materials.filter(m=>m.stock<=m.minStock);
-  $('d-lowstock').innerHTML=low.length?low.map(m=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;color:var(--text)">${m.name}</span><span class="badge b-low">${m.stock} uds</span></div>`).join(''):`<p class="hint" style="color:var(--accent)">✓ Todo el stock está bien.</p>`;
+  $('d-lowstock').innerHTML=low.length?low.map(m=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;color:var(--text)">${m.name}</span><span class="badge b-low">${m.stock} ${m.cat==='filamento'?'g':'uds'}</span></div>`).join(''):`<p class="hint" style="color:var(--accent)">✓ Todo el stock está bien.</p>`;
   $('d-finsummary').innerHTML=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Ingresos</span><span style="color:var(--accent)">${fmt(revenue)}</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Costes prod.</span><span style="color:var(--red)">${fmt(cost)}</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Gastos</span><span style="color:var(--red)">${fmt(expTotal)}</span></div><div style="display:flex;justify-content:space-between;padding:9px 0 3px;font-size:13px;font-weight:600;"><span>Beneficio</span><span style="color:var(--yellow)">${fmt(revenue-cost-expTotal)}</span></div>`;
 }
 
@@ -1162,10 +1184,28 @@ function toggleCalcField(key,val){
   if(window.dbOps)window.dbOps.saveSettings({calcSettings:window._calcSettings});
   calc();
 }
+function populateFilamentInventory(){
+  const grp=$('filamentInventoryGroup');if(!grp)return;
+  const sel=$('filamentType');const prevVal=sel.value;
+  const spools=(window._data.materials||[]).filter(m=>m.cat==='filamento');
+  grp.innerHTML=spools.map(m=>{
+    const label=`${m.type||'?'}${m.color?' · '+m.color:''} — ${m.stock||0}g`;
+    return `<option value="inv:${m.id}">${label}</option>`;
+  }).join('');
+  grp.style.display=spools.length?'':'none';
+  // Restore selection if still valid, otherwise keep current
+  if(prevVal&&[...sel.options].some(o=>o.value===prevVal))sel.value=prevVal;
+}
 function handleFilamentChange(){
   const val=$('filamentType').value;
   $('f-customFilament').style.display=val==='custom'?'':'none';
-  const p=FP[val];if(p&&p.p!==null){$('spoolPrice').value=p.p;if($('printerWatts'))$('printerWatts').value=p.w;}
+  if(val.startsWith('inv:')){
+    const id=val.slice(4);
+    const m=(window._data.materials||[]).find(x=>x.id===id);
+    if(m){$('spoolPrice').value=m.price||0;$('spoolWeight').value=m.spool||1000;}
+  }else{
+    const p=FP[val];if(p&&p.p!==null){$('spoolPrice').value=p.p;if($('printerWatts'))$('printerWatts').value=p.w;}
+  }
   calc();
 }
 function getCCVal(id){
@@ -1374,10 +1414,14 @@ async function buildOrderObject(){
   const q=Math.max(parseInt($('m-qty').value)||1,1);
   const code=await getNextCode('order');
   if(!$('m-clientSel').value&&clientName){const exists=window._data.clients.find(c=>c.name.toLowerCase()===clientName.toLowerCase());if(!exists&&window.dbOps){const cc=await getNextCode('client');await window.dbOps.addClient({name:clientName,apellidos:$('m-apellidos').value.trim(),phone,email:$('m-email').value.trim(),notes:'',code:cc,status:'activo'});}}
-  return{pieceName:pn,code,client:clientName,apellidos:$('m-apellidos').value.trim(),phone,email:$('m-email').value.trim(),qty:q,status:$('m-status').value,date:$('m-date').value,notes:$('m-notes').value.trim(),fileName:selectedFile?selectedFile.name:'',costPerPiece:fmtR(C.total),pricePerPiece:fmtR(C.sp),priceWithFee:fmtR(C.spf),totalOrder:fmtR(C.spf*q),margin:C.mg,platformFee:C.pf,budgetNum:'',invoiceNum:'',breakdown:{fc:fmtR(C.fc),ec:fmtR(C.ec),dc:fmtR(C.dc),mc:fmtR(C.mc),lc:fmtR(C.lc),pk:fmtR(C.pk),sh:fmtR(C.sh),cc:fmtR(C.cc)}};
+  const filType=$('filamentType').value;
+  const filGramsPerUnit=vf('filamentWeight');
+  const filamentUsed={materialId:filType.startsWith('inv:')?filType.slice(4):null,gramsPerUnit:filGramsPerUnit,totalGrams:fmtR(filGramsPerUnit*q)};
+  return{pieceName:pn,code,client:clientName,apellidos:$('m-apellidos').value.trim(),phone,email:$('m-email').value.trim(),qty:q,status:$('m-status').value,date:$('m-date').value,notes:$('m-notes').value.trim(),fileName:selectedFile?selectedFile.name:'',costPerPiece:fmtR(C.total),pricePerPiece:fmtR(C.sp),priceWithFee:fmtR(C.spf),totalOrder:fmtR(C.spf*q),margin:C.mg,platformFee:C.pf,budgetNum:'',invoiceNum:'',filamentUsed,printMinutes:vf('printHours'),laborMinutes:vf('laborHours'),postMinutes:vf('postHours'),stockDeducted:false,breakdown:{fc:fmtR(C.fc),ec:fmtR(C.ec),dc:fmtR(C.dc),mc:fmtR(C.mc),lc:fmtR(C.lc),pk:fmtR(C.pk),sh:fmtR(C.sh),cc:fmtR(C.cc)}};
 }
 async function saveOrder(){
   const order=await buildOrderObject();if(!order)return;
+  if(PRODUCTION_STATUSES.includes(order.status)){if(await deductFilamentStock(order))order.stockDeducted=true;}
   let docRef;
   if(window.dbOps) docRef=await window.dbOps.addOrder(order);
   // Subir archivo a Storage si hay uno seleccionado
@@ -1393,6 +1437,7 @@ async function saveOrder(){
 }
 async function saveOrderAndGenerate(type){
   const order=await buildOrderObject();if(!order)return;
+  if(PRODUCTION_STATUSES.includes(order.status)){if(await deductFilamentStock(order))order.stockDeducted=true;}
   const docCode=await getNextCode(type);
   if(type==='budget')order.budgetNum=docCode;else order.invoiceNum=docCode;
   let docRef;
@@ -1417,7 +1462,7 @@ function renderOrders(){
   if(orderFilter!=='all')orders=orders.filter(o=>o.status===orderFilter);
   if(q)orders=orders.filter(o=>(o.pieceName+o.client+(o.code||'')+(o.notes||'')).toLowerCase().includes(q));
   if(!orders.length){$('orderTable').innerHTML=`<div class="empty"><div class="ei">📦</div><p>${orderFilter==='all'&&!q?'Sin pedidos.<br>Ve a la <strong>Calculadora</strong> y guarda tu primer pedido.':'Sin pedidos con este filtro.'}</p></div>`;return;}
-  $('orderTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Pieza</th><th>Cliente</th><th>Fecha</th><th>Uds</th><th>Coste</th><th>Total</th><th>Margen</th><th>Estado</th><th>Docs</th><th></th></tr></thead><tbody>${orders.map(o=>{const s=STATUS_CFG[o.status]||{icon:'?',label:o.status,color:'var(--muted)'};const fileBtn=o.fileUrl?`<a href="${o.fileUrl}" target="_blank" class="btn btn-ghost btn-sm btn-icon" title="${o.fileName||'Archivo'}">📁</a>`:'';const qty=o.qty||1;const costTotal=(o.costPerPiece||0)*qty;const margin=(o.totalOrder||0)-costTotal;const marginColor=margin>0?'var(--accent)':(margin<0?'var(--red)':'var(--muted)');return`<tr><td><span class="code-badge">${o.code||'—'}</span></td><td class="tdn">${o.pieceName}</td><td>${o.client||''}${o.apellidos?' '+o.apellidos:''}</td><td>${fmtDate(o.date)}</td><td>${qty}</td><td style="color:var(--red);font-weight:600">${fmt(costTotal)}</td><td style="color:var(--a2);font-weight:600">${fmt(o.totalOrder||0)}</td><td style="color:${marginColor};font-weight:600">${fmt(margin)}</td><td><select style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:${s.color};font-size:10px;padding:3px 5px;cursor:pointer;font-family:'DM Mono',monospace;max-width:140px;" onchange="changeOrderStatus('${o.id}',this)">${Object.entries(STATUS_CFG).map(([k,v])=>`<option value="${k}" ${o.status===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}</select></td><td style="display:flex;gap:3px;">${fileBtn}<button class="btn btn-orange btn-sm btn-icon" onclick="genDocForOrder('${o.id}','budget')" title="Presupuesto">📄</button><button class="btn btn-blue btn-sm btn-icon" onclick="genDocForOrder('${o.id}','invoice')" title="Factura">🧾</button></td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="openEditOrder('${o.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteOrder('${o.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;
+  $('orderTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Pieza</th><th>Cliente</th><th>Fecha</th><th>Uds</th><th>Coste</th><th>Total</th><th>Margen</th><th>Estado</th><th>Docs</th><th></th></tr></thead><tbody>${orders.map(o=>{const s=STATUS_CFG[o.status]||{icon:'?',label:o.status,color:'var(--muted)'};const fileBtn=o.fileUrl?`<a href="${o.fileUrl}" target="_blank" class="btn btn-ghost btn-sm btn-icon" title="${o.fileName||'Archivo'}">📁</a>`:'';const qty=o.qty||1;const costTotal=(o.costPerPiece||0)*qty;const margin=(o.totalOrder||0)-costTotal;const marginColor=margin>0?'var(--accent)':(margin<0?'var(--red)':'var(--muted)');const fu=o.filamentUsed;const subBits=[];if(fu&&fu.gramsPerUnit)subBits.push(`🧵 ${fu.gramsPerUnit}g`);if(o.printMinutes)subBits.push(`⏱ ${o.printMinutes}min`);const subline=subBits.length?`<div style="font-size:10px;color:var(--muted);margin-top:2px;">${subBits.join(' · ')}</div>`:'';return`<tr><td><span class="code-badge">${o.code||'—'}</span></td><td class="tdn">${o.pieceName}${subline}</td><td>${o.client||''}${o.apellidos?' '+o.apellidos:''}</td><td>${fmtDate(o.date)}</td><td>${qty}</td><td style="color:var(--red);font-weight:600">${fmt(costTotal)}</td><td style="color:var(--a2);font-weight:600">${fmt(o.totalOrder||0)}</td><td style="color:${marginColor};font-weight:600">${fmt(margin)}</td><td><select style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:${s.color};font-size:10px;padding:3px 5px;cursor:pointer;font-family:'DM Mono',monospace;max-width:140px;" onchange="changeOrderStatus('${o.id}',this)">${Object.entries(STATUS_CFG).map(([k,v])=>`<option value="${k}" ${o.status===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}</select></td><td style="display:flex;gap:3px;">${fileBtn}<button class="btn btn-orange btn-sm btn-icon" onclick="genDocForOrder('${o.id}','budget')" title="Presupuesto">📄</button><button class="btn btn-blue btn-sm btn-icon" onclick="genDocForOrder('${o.id}','invoice')" title="Factura">🧾</button></td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="showOrderDetail('${o.id}')" title="Detalles">ℹ️</button><button class="btn btn-ghost btn-sm btn-icon" onclick="openEditOrder('${o.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteOrder('${o.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;
 }
 async function genDocForOrder(id,type){
   const o=window._data.orders.find(x=>x.id===id);if(!o)return;
@@ -1513,6 +1558,10 @@ let _editSelectedFile=null;
 function handleEditFileSelect(input){_editSelectedFile=input.files[0];if(_editSelectedFile){$('eo-file-new-name').textContent=`📎 ${_editSelectedFile.name}`;}}
 
 async function updateOrder(){const id=$('eo-id').value;if(!id)return;const pn=$('eo-piece').value.trim();if(!pn){toast('Nombre obligatorio','red');return;}const qty=Math.max(parseInt($('eo-qty').value)||1,1);const price=parseFloat($('eo-price').value)||0;const data={pieceName:pn,client:$('eo-client').value.trim(),apellidos:$('eo-apellidos').value.trim(),phone:$('eo-phone').value.trim(),email:$('eo-email').value.trim(),qty,date:$('eo-date').value,status:$('eo-status').value,budgetNum:$('eo-budget').value.trim(),invoiceNum:$('eo-invoice').value.trim(),costPerPiece:parseFloat($('eo-cost').value)||0,pricePerPiece:price,totalOrder:fmtR(price*qty),notes:$('eo-notes').value.trim()};
+  const existing=window._data.orders.find(o=>o.id===id);
+  if(existing&&!existing.stockDeducted&&PRODUCTION_STATUSES.includes(data.status)){
+    if(await deductFilamentStock({...existing,qty}))data.stockDeducted=true;
+  }
   if(window.dbOps)await window.dbOps.updateOrder(id,data);
   // Subir nuevo archivo si se seleccionó uno
   if(_editSelectedFile && window.uploadFileToStorage){
@@ -1528,8 +1577,39 @@ async function updateOrder(){const id=$('eo-id').value;if(!id)return;const pn=$(
   }
   closeModal('editOrderModal');toast('✓ Pedido actualizado','green');}
 async function generateDocFromEdit(type){const id=$('eo-id').value;if(!id)return;await updateOrder();setTimeout(()=>genDocForOrder(id,type),600);}
-async function changeOrderStatus(id,sel){if(window.dbOps)await window.dbOps.updateOrder(id,{status:sel.value});sel.style.color=STATUS_CFG[sel.value]?.color||'var(--muted)';toast('Estado actualizado');}
+async function changeOrderStatus(id,sel){
+  const newStatus=sel.value;
+  const order=window._data.orders.find(o=>o.id===id);
+  const upd={status:newStatus};
+  if(order&&!order.stockDeducted&&PRODUCTION_STATUSES.includes(newStatus)){
+    if(await deductFilamentStock(order))upd.stockDeducted=true;
+  }
+  if(window.dbOps)await window.dbOps.updateOrder(id,upd);
+  sel.style.color=STATUS_CFG[newStatus]?.color||'var(--muted)';toast('Estado actualizado');
+}
 async function deleteOrder(id){if(!confirm('¿Eliminar este pedido?'))return;if(window.dbOps)await window.dbOps.deleteOrder(id);toast('Pedido eliminado','red');}
+function showOrderDetail(id){
+  const o=window._data.orders.find(x=>x.id===id);if(!o)return;
+  $('odm-title').textContent=`ℹ️ ${o.pieceName} ${o.code?`· ${o.code}`:''}`;
+  const fu=o.filamentUsed;
+  const mat=fu&&fu.materialId?(window._data.materials||[]).find(m=>m.id===fu.materialId):null;
+  const spoolLine=mat?`${mat.type||'?'}${mat.color?' · '+mat.color:''}`:(fu?'Genérico (sin carrete de inventario)':'—');
+  const b=o.breakdown||{};
+  const compRows=[['Filamento',b.fc],['Electricidad',b.ec],['Amortización',b.dc],['Mantenimiento',b.mc],['Mano de obra',b.lc],['Embalaje',b.pk],['Envío',b.sh],['Extras',b.cc]].filter(([,v])=>v>0);
+  $('odm-body').innerHTML=`
+    <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Material</div>
+    <div style="font-size:12px;color:var(--text);margin-bottom:4px">🧵 Carrete: ${spoolLine}</div>
+    <div style="font-size:12px;color:var(--text);margin-bottom:12px">⚖️ ${fu?fu.gramsPerUnit:'—'}g/ud · ${fu?fu.totalGrams:'—'}g total (${o.qty||1} uds)</div>
+    <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Tiempos</div>
+    <div style="font-size:12px;color:var(--text);margin-bottom:12px">⏱ Impresión: ${o.printMinutes||0}min · Mano de obra: ${o.laborMinutes||0}min · Post-proceso: ${o.postMinutes||0}min</div>
+    <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Desglose de coste (por unidad)</div>
+    ${compRows.length?compRows.map(([l,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">${l}</span><span>${fmt(v)}</span></div>`).join(''):'<p class="hint">Sin desglose disponible.</p>'}
+    <div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:13px;font-weight:700;margin-top:4px;"><span>Coste/unidad</span><span style="color:var(--red)">${fmt(o.costPerPiece||0)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;font-weight:700;"><span>Precio venta/unidad</span><span style="color:var(--a2)">${fmt(o.pricePerPiece||0)}</span></div>
+    ${o.stockDeducted?'<div style="font-size:11px;color:var(--accent);margin-top:10px;">✓ Stock de filamento descontado</div>':'<div style="font-size:11px;color:var(--muted);margin-top:10px;">Stock no descontado aún (pendiente de entrar en producción)</div>'}
+  `;
+  $('orderDetailModal').classList.add('open');
+}
 
 /* ════ CLIENTS ════ */
 let editingClientId=null;
@@ -1540,10 +1620,14 @@ function showClientDetail(id){const c=window._data.clients.find(x=>x.id===id);if
 
 /* ════ MATERIALS ════ */
 let editingMatId=null;
-function renderMatFields(){const cat=$('mm-cat').value;const fields={filamento:`<div class="fr"><div class="field"><label>Tipo</label><select id="mm-type"><option>PLA</option><option>PLA+</option><option>PETG</option><option>ABS</option><option>ASA</option><option>TPU</option><option>Resina</option><option>Bambu Lab</option><option>Otro</option></select></div><div class="field"><label>Color</label><input type="text" id="mm-color" placeholder="Negro"></div></div><div class="fr"><div class="field"><label>Precio/carrete (€)</label><div class="iw"><input type="number" id="mm-price" value="22" min="0" step=".01" class="hu"><span class="unit">€</span></div></div><div class="field"><label>Peso carrete (g)</label><div class="iw"><input type="number" id="mm-spool" value="1000" min="1" class="hu"><span class="unit">g</span></div></div></div>`,impresora:`<div class="fr"><div class="field"><label>Modelo</label><input type="text" id="mm-model" placeholder="Bambu Lab P2S"></div><div class="field"><label>Precio compra (€)</label><div class="iw"><input type="number" id="mm-price" value="1200" min="0" step="1" class="hu"><span class="unit">€</span></div></div></div><div class="fr"><div class="field"><label>Consumo (W)</label><div class="iw"><input type="number" id="mm-watts" value="200" min="1" class="hu"><span class="unit">W</span></div></div><div class="field"><label>Vida útil (h)</label><div class="iw"><input type="number" id="mm-life" value="5000" min="100" class="hu"><span class="unit">h</span></div></div></div>`,consumible:`<div class="fr"><div class="field"><label>Subcategoría</label><select id="mm-subcat"><option>Pegamento</option><option>Grasa/lubricante</option><option>Lija/abrasivo</option><option>Pintura</option><option>Resina UV</option><option>Cinta impresión</option><option>Herramienta</option><option>Otro</option></select></div><div class="field"><label>Precio unidad (€)</label><div class="iw"><input type="number" id="mm-price" value="5" min="0" step=".01" class="hu"><span class="unit">€</span></div></div></div>`,quimico:`<div class="fr"><div class="field"><label>Tipo</label><input type="text" id="mm-chemtype" placeholder="Acetona, IPA…"></div><div class="field"><label>Precio (€)</label><div class="iw"><input type="number" id="mm-price" value="10" min="0" step=".01" class="hu"><span class="unit">€</span></div></div></div>`,otro:`<div class="field"><label>Precio (€)</label><div class="iw"><input type="number" id="mm-price" value="0" min="0" step=".01" class="hu"><span class="unit">€</span></div></div>`};$('mm-dynamic-fields').innerHTML=fields[cat]||fields.otro;}
-function openMaterialModal(id){editingMatId=id||null;renderMatFields();if(id){const m=window._data.materials.find(x=>x.id===id)||{};$('matModalTitle').textContent='✏️ Editar material';$('mm-id').value=id;$('mm-name').value=m.name||'';$('mm-cat').value=m.cat||'filamento';renderMatFields();if($('mm-type'))$('mm-type').value=m.type||'PLA';if($('mm-color'))$('mm-color').value=m.color||'';if($('mm-price'))$('mm-price').value=m.price||0;if($('mm-model'))$('mm-model').value=m.model||'';$('mm-stock').value=m.stock||1;$('mm-min').value=m.minStock||1;$('mm-supplier').value=m.supplier||'';}else{$('matModalTitle').textContent='🧵 Nuevo material';['mm-id','mm-name','mm-supplier'].forEach(f=>$(f).value='');$('mm-cat').value='filamento';renderMatFields();$('mm-stock').value=1;$('mm-min').value=1;}$('materialModal').classList.add('open');}
-async function saveMaterial(){const name=$('mm-name').value.trim();if(!name){toast('Nombre obligatorio','red');return;}const obj={name,cat:$('mm-cat').value,type:$('mm-type')?.value||'',color:$('mm-color')?.value||'',price:parseFloat($('mm-price')?.value)||0,model:$('mm-model')?.value||'',watts:parseFloat($('mm-watts')?.value)||0,life:parseFloat($('mm-life')?.value)||0,stock:parseInt($('mm-stock').value)||0,minStock:parseInt($('mm-min').value)||1,supplier:$('mm-supplier').value.trim()};if(editingMatId&&window.dbOps)await window.dbOps.updateMaterial(editingMatId,obj);else if(window.dbOps)await window.dbOps.addMaterial(obj);closeModal('materialModal');toast('✓ Material guardado','green');}
-function renderMaterials(){const mats=window._data.materials;if(!mats.length){$('materialTable').innerHTML=`<div class="empty"><div class="ei">🧵</div><p>Sin materiales.<br>Añade filamentos, impresoras y consumibles.</p></div>`;return;}const catIcon={filamento:'🧵',impresora:'🖨',consumible:'🔧',quimico:'🧪',otro:'📦'};$('materialTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Cat.</th><th>Material</th><th>Detalle</th><th>Precio</th><th>Stock</th><th>Mín.</th><th>Proveedor</th><th></th></tr></thead><tbody>${mats.map(m=>`<tr><td><span class="tag">${catIcon[m.cat]||'📦'} ${m.cat||'otro'}</span></td><td class="tdn">${m.name}</td><td style="font-size:11px;color:var(--muted)">${m.type||m.model||'—'}${m.color?' · '+m.color:''}</td><td>${m.price?fmt(m.price):'—'}</td><td><span class="badge ${m.stock<=m.minStock?'b-low':'b-ok'}">${m.stock} uds</span></td><td style="color:var(--muted)">${m.minStock}</td><td style="font-size:11px;color:var(--muted)">${m.supplier||'—'}</td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="openMaterialModal('${m.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteMaterial('${m.id}')">🗑</button></td></tr>`).join('')}</tbody></table></div>`;}
+function renderMatFields(){const cat=$('mm-cat').value;const fields={filamento:`<div class="fr"><div class="field"><label>Tipo</label><select id="mm-type"><option>PLA</option><option>PLA+</option><option>PETG</option><option>ABS</option><option>ASA</option><option>TPU</option><option>Resina</option><option>Bambu Lab</option><option>Otro</option></select></div><div class="field"><label>Color</label><input type="text" id="mm-color" placeholder="Negro"></div></div><div class="fr"><div class="field"><label>Precio/carrete (€)</label><div class="iw"><input type="number" id="mm-price" value="22" min="0" step=".01" class="hu"><span class="unit">€</span></div></div><div class="field"><label>Peso carrete (g)</label><div class="iw"><input type="number" id="mm-spool" value="1000" min="1" class="hu"><span class="unit">g</span></div></div></div>`,impresora:`<div class="fr"><div class="field"><label>Modelo</label><input type="text" id="mm-model" placeholder="Bambu Lab P2S"></div><div class="field"><label>Precio compra (€)</label><div class="iw"><input type="number" id="mm-price" value="1200" min="0" step="1" class="hu"><span class="unit">€</span></div></div></div><div class="fr"><div class="field"><label>Consumo (W)</label><div class="iw"><input type="number" id="mm-watts" value="200" min="1" class="hu"><span class="unit">W</span></div></div><div class="field"><label>Vida útil (h)</label><div class="iw"><input type="number" id="mm-life" value="5000" min="100" class="hu"><span class="unit">h</span></div></div></div>`,consumible:`<div class="fr"><div class="field"><label>Subcategoría</label><select id="mm-subcat"><option>Pegamento</option><option>Grasa/lubricante</option><option>Lija/abrasivo</option><option>Pintura</option><option>Resina UV</option><option>Cinta impresión</option><option>Herramienta</option><option>Otro</option></select></div><div class="field"><label>Precio unidad (€)</label><div class="iw"><input type="number" id="mm-price" value="5" min="0" step=".01" class="hu"><span class="unit">€</span></div></div></div>`,quimico:`<div class="fr"><div class="field"><label>Tipo</label><input type="text" id="mm-chemtype" placeholder="Acetona, IPA…"></div><div class="field"><label>Precio (€)</label><div class="iw"><input type="number" id="mm-price" value="10" min="0" step=".01" class="hu"><span class="unit">€</span></div></div></div>`,otro:`<div class="field"><label>Precio (€)</label><div class="iw"><input type="number" id="mm-price" value="0" min="0" step=".01" class="hu"><span class="unit">€</span></div></div>`};$('mm-dynamic-fields').innerHTML=fields[cat]||fields.otro;
+  const stockField=$('mm-stock').closest('.field');const minField=$('mm-min').closest('.field');
+  if(cat==='filamento'){stockField.querySelector('label').textContent='Stock actual (g)';minField.querySelector('label').textContent='Stock mínimo (g)';$('mm-stock-unit').textContent='g';$('mm-min-unit').textContent='g';$('mm-stock').step='1';$('mm-min').step='1';}
+  else{stockField.querySelector('label').textContent='Stock actual';minField.querySelector('label').textContent='Stock mínimo';$('mm-stock-unit').textContent='uds';$('mm-min-unit').textContent='uds';$('mm-stock').step='1';$('mm-min').step='1';}
+}
+function openMaterialModal(id){editingMatId=id||null;renderMatFields();if(id){const m=window._data.materials.find(x=>x.id===id)||{};$('matModalTitle').textContent='✏️ Editar material';$('mm-id').value=id;$('mm-name').value=m.name||'';$('mm-cat').value=m.cat||'filamento';renderMatFields();if($('mm-type'))$('mm-type').value=m.type||'PLA';if($('mm-color'))$('mm-color').value=m.color||'';if($('mm-price'))$('mm-price').value=m.price||0;if($('mm-spool'))$('mm-spool').value=m.spool||1000;if($('mm-model'))$('mm-model').value=m.model||'';$('mm-stock').value=m.stock||1;$('mm-min').value=m.minStock||1;$('mm-supplier').value=m.supplier||'';}else{$('matModalTitle').textContent='🧵 Nuevo material';['mm-id','mm-name','mm-supplier'].forEach(f=>$(f).value='');$('mm-cat').value='filamento';renderMatFields();$('mm-stock').value=1000;$('mm-min').value=200;}$('materialModal').classList.add('open');}
+async function saveMaterial(){const name=$('mm-name').value.trim();if(!name){toast('Nombre obligatorio','red');return;}const obj={name,cat:$('mm-cat').value,type:$('mm-type')?.value||'',color:$('mm-color')?.value||'',price:parseFloat($('mm-price')?.value)||0,spool:parseFloat($('mm-spool')?.value)||0,model:$('mm-model')?.value||'',watts:parseFloat($('mm-watts')?.value)||0,life:parseFloat($('mm-life')?.value)||0,stock:parseFloat($('mm-stock').value)||0,minStock:parseFloat($('mm-min').value)||1,supplier:$('mm-supplier').value.trim()};if(editingMatId&&window.dbOps)await window.dbOps.updateMaterial(editingMatId,obj);else if(window.dbOps)await window.dbOps.addMaterial(obj);closeModal('materialModal');toast('✓ Material guardado','green');}
+function renderMaterials(){const mats=window._data.materials;if(!mats.length){$('materialTable').innerHTML=`<div class="empty"><div class="ei">🧵</div><p>Sin materiales.<br>Añade filamentos, impresoras y consumibles.</p></div>`;return;}const catIcon={filamento:'🧵',impresora:'🖨',consumible:'🔧',quimico:'🧪',otro:'📦'};$('materialTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Cat.</th><th>Material</th><th>Detalle</th><th>Precio</th><th>Stock</th><th>Mín.</th><th>Proveedor</th><th></th></tr></thead><tbody>${mats.map(m=>{const unit=m.cat==='filamento'?'g':'uds';return`<tr><td><span class="tag">${catIcon[m.cat]||'📦'} ${m.cat||'otro'}</span></td><td class="tdn">${m.name}</td><td style="font-size:11px;color:var(--muted)">${m.type||m.model||'—'}${m.color?' · '+m.color:''}</td><td>${m.price?fmt(m.price):'—'}</td><td><span class="badge ${m.stock<=m.minStock?'b-low':'b-ok'}">${m.stock} ${unit}</span></td><td style="color:var(--muted)">${m.minStock} ${unit}</td><td style="font-size:11px;color:var(--muted)">${m.supplier||'—'}</td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="openMaterialModal('${m.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteMaterial('${m.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;}
 async function deleteMaterial(id){if(!confirm('¿Eliminar?'))return;if(window.dbOps)await window.dbOps.deleteMaterial(id);toast('Material eliminado','red');}
 
 /* ════ FINANCE ════ */
