@@ -1085,6 +1085,16 @@ async function deductFilamentStock(order){
   if(window.dbOps)await window.dbOps.updateMaterial(mat.id,{stock:fmtR(newStock)});
   return true;
 }
+async function restoreFilamentStock(order){
+  if(!order||!order.stockDeducted)return false;
+  const fu=order.filamentUsed;
+  if(!fu||!fu.materialId||!fu.totalGrams)return false;
+  const mat=(window._data.materials||[]).find(m=>m.id===fu.materialId);
+  if(!mat)return false;
+  const newStock=(mat.stock||0)+fu.totalGrams;
+  if(window.dbOps)await window.dbOps.updateMaterial(mat.id,{stock:fmtR(newStock)});
+  return true;
+}
 
 /* ════ CORRELATIVE CODES ════ */
 async function getNextCode(type){
@@ -1583,6 +1593,8 @@ async function updateOrder(){const id=$('eo-id').value;if(!id)return;const pn=$(
   const existing=window._data.orders.find(o=>o.id===id);
   if(existing&&!existing.stockDeducted&&PRODUCTION_STATUSES.includes(data.status)){
     if(await deductFilamentStock({...existing,qty}))data.stockDeducted=true;
+  }else if(existing&&existing.stockDeducted&&!PRODUCTION_STATUSES.includes(data.status)){
+    if(await restoreFilamentStock(existing))data.stockDeducted=false;
   }
   if(window.dbOps)await window.dbOps.updateOrder(id,data);
   // Subir nuevo archivo si se seleccionó uno
@@ -1605,11 +1617,19 @@ async function changeOrderStatus(id,sel){
   const upd={status:newStatus};
   if(order&&!order.stockDeducted&&PRODUCTION_STATUSES.includes(newStatus)){
     if(await deductFilamentStock(order))upd.stockDeducted=true;
+  }else if(order&&order.stockDeducted&&!PRODUCTION_STATUSES.includes(newStatus)){
+    if(await restoreFilamentStock(order))upd.stockDeducted=false;
   }
   if(window.dbOps)await window.dbOps.updateOrder(id,upd);
   sel.style.color=STATUS_CFG[newStatus]?.color||'var(--muted)';toast('Estado actualizado');
 }
-async function deleteOrder(id){if(!confirm('¿Eliminar este pedido?'))return;if(window.dbOps)await window.dbOps.deleteOrder(id);toast('Pedido eliminado','red');}
+async function deleteOrder(id){
+  if(!confirm('¿Eliminar este pedido?'))return;
+  const order=window._data.orders.find(o=>o.id===id);
+  if(order&&order.stockDeducted)await restoreFilamentStock(order);
+  if(window.dbOps)await window.dbOps.deleteOrder(id);
+  toast('Pedido eliminado','red');
+}
 function showOrderDetail(id){
   const o=window._data.orders.find(x=>x.id===id);if(!o)return;
   $('odm-title').textContent=`ℹ️ ${o.pieceName} ${o.code?`· ${o.code}`:''}`;
