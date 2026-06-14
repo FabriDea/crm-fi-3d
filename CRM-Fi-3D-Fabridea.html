@@ -392,8 +392,11 @@ tr:hover td{background:var(--s2);}
     <div class="card"><div class="ct"><span class="dot"></span>Estado de pedidos</div><div id="d-status-bars"></div></div>
     <div class="card"><div class="ct"><span class="dot"></span>Últimos pedidos</div><div id="d-recent"></div></div>
   </div>
-  <div class="g2">
+  <div class="g2" style="margin-bottom:12px">
+    <div class="card"><div class="ct"><span class="dot"></span>Stock de filamentos 🧵</div><div id="d-filstock"></div></div>
     <div class="card"><div class="ct"><span class="dot"></span>Stock bajo ⚠️</div><div id="d-lowstock"></div></div>
+  </div>
+  <div class="g2">
     <div class="card"><div class="ct"><span class="dot"></span>Resumen financiero</div><div id="d-finsummary"></div></div>
   </div>
 </div>
@@ -603,7 +606,23 @@ tr:hover td{background:var(--s2);}
 <div class="page" id="page-materials">
   <div class="ph">
     <div><div class="ph-title">Materiales</div><div class="ph-sub">Stock completo</div></div>
-    <div class="ph-actions"><button class="btn btn-primary btn-sm" onclick="openMaterialModal()">＋ Nuevo material</button></div>
+    <div class="ph-actions">
+      <select id="matSort" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:7px 10px;cursor:pointer;font-family:inherit;" onchange="renderMaterials()">
+        <option value="default">Orden: por defecto</option>
+        <option value="stock-asc">Stock: menor primero</option>
+        <option value="stock-desc">Stock: mayor primero</option>
+        <option value="name">Nombre A-Z</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="openMaterialModal()">＋ Nuevo material</button>
+    </div>
+  </div>
+  <div class="pill-row">
+    <button class="pill active" onclick="setMF('all',this)">Todos</button>
+    <button class="pill" onclick="setMF('filamento',this)">🧵 Filamento</button>
+    <button class="pill" onclick="setMF('impresora',this)">🖨 Impresora</button>
+    <button class="pill" onclick="setMF('consumible',this)">🔧 Consumible</button>
+    <button class="pill" onclick="setMF('quimico',this)">🧪 Químico</button>
+    <button class="pill" onclick="setMF('otro',this)">📦 Otro</button>
   </div>
   <div id="materialTable"></div>
 </div>
@@ -1145,6 +1164,9 @@ function renderDashboard(){
   $('d-recent').innerHTML=orders.slice(0,5).map(o=>{const s=STATUS_CFG[o.status]||{icon:'?'};return`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);"><div><div style="font-size:12px;color:var(--text)">${o.pieceName}</div><div style="font-size:10px;color:var(--muted)">${o.client||''} · ${fmtDate(o.date)}</div></div><span style="font-size:16px">${s.icon}</span></div>`;}).join('')||'<p class="hint">Sin pedidos.</p>';
   const low=materials.filter(m=>m.stock<=m.minStock);
   $('d-lowstock').innerHTML=low.length?low.map(m=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;color:var(--text)">${m.name}</span><span class="badge b-low">${m.stock} ${m.cat==='filamento'?'g':'uds'}</span></div>`).join(''):`<p class="hint" style="color:var(--accent)">✓ Todo el stock está bien.</p>`;
+  const filaments=materials.filter(m=>m.cat==='filamento').sort((a,b)=>(a.stock||0)-(b.stock||0));
+  const filTop=filaments.slice(0,4);
+  $('d-filstock').innerHTML=filTop.length?filTop.map(m=>{const label=`${m.type||'?'}${m.color?' · '+m.color:''}`;const low=m.stock<=m.minStock;return`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;color:var(--text)">${label}</span><span class="badge ${low?'b-low':'b-ok'}">${m.stock||0} g</span></div>`;}).join('')+(filaments.length>4?`<button class="btn btn-ghost btn-sm btn-full" style="margin-top:8px" onclick="go('materials')">Ver todos (${filaments.length}) →</button>`:''):'<p class="hint">Sin filamentos en inventario.</p>';
   $('d-finsummary').innerHTML=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Ingresos</span><span style="color:var(--accent)">${fmt(revenue)}</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Costes prod.</span><span style="color:var(--red)">${fmt(cost)}</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Gastos</span><span style="color:var(--red)">${fmt(expTotal)}</span></div><div style="display:flex;justify-content:space-between;padding:9px 0 3px;font-size:13px;font-weight:600;"><span>Beneficio</span><span style="color:var(--yellow)">${fmt(revenue-cost-expTotal)}</span></div>`;
 }
 
@@ -1644,7 +1666,16 @@ async function saveMaterial(){const name=$('mm-name').value.trim();if(!name){toa
   let type=$('mm-type')?.value||'';
   if(type==='Otro'){const custom=$('mm-type-other')?.value.trim();if(!custom){toast('Especifica el tipo de filamento','red');return;}type=custom;}
   const obj={name,cat:$('mm-cat').value,type,color:$('mm-color')?.value||'',price:parseFloat($('mm-price')?.value)||0,spool:parseFloat($('mm-spool')?.value)||0,model:$('mm-model')?.value||'',watts:parseFloat($('mm-watts')?.value)||0,life:parseFloat($('mm-life')?.value)||0,stock:parseFloat($('mm-stock').value)||0,minStock:parseFloat($('mm-min').value)||1,supplier:$('mm-supplier').value.trim()};if(editingMatId&&window.dbOps)await window.dbOps.updateMaterial(editingMatId,obj);else if(window.dbOps)await window.dbOps.addMaterial(obj);closeModal('materialModal');toast('✓ Material guardado','green');}
-function renderMaterials(){const mats=window._data.materials;if(!mats.length){$('materialTable').innerHTML=`<div class="empty"><div class="ei">🧵</div><p>Sin materiales.<br>Añade filamentos, impresoras y consumibles.</p></div>`;return;}const catIcon={filamento:'🧵',impresora:'🖨',consumible:'🔧',quimico:'🧪',otro:'📦'};$('materialTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Cat.</th><th>Material</th><th>Detalle</th><th>Precio</th><th>Stock</th><th>Mín.</th><th>Proveedor</th><th></th></tr></thead><tbody>${mats.map(m=>{const unit=m.cat==='filamento'?'g':'uds';return`<tr><td><span class="tag">${catIcon[m.cat]||'📦'} ${m.cat||'otro'}</span></td><td class="tdn">${m.name}</td><td style="font-size:11px;color:var(--muted)">${m.type||m.model||'—'}${m.color?' · '+m.color:''}</td><td>${m.price?fmt(m.price):'—'}</td><td><span class="badge ${m.stock<=m.minStock?'b-low':'b-ok'}">${m.stock} ${unit}</span></td><td style="color:var(--muted)">${m.minStock} ${unit}</td><td style="font-size:11px;color:var(--muted)">${m.supplier||'—'}</td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="openMaterialModal('${m.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteMaterial('${m.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;}
+let matFilter='all';
+function setMF(f,btn){matFilter=f;document.querySelectorAll('#page-materials .pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderMaterials();}
+function renderMaterials(){let mats=window._data.materials||[];
+  if(matFilter!=='all')mats=mats.filter(m=>(m.cat||'otro')===matFilter);
+  const sortMode=$('matSort')?.value||'default';
+  mats=[...mats];
+  if(sortMode==='stock-asc')mats.sort((a,b)=>(a.stock||0)-(b.stock||0));
+  else if(sortMode==='stock-desc')mats.sort((a,b)=>(b.stock||0)-(a.stock||0));
+  else if(sortMode==='name')mats.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(!mats.length){$('materialTable').innerHTML=`<div class="empty"><div class="ei">🧵</div><p>${matFilter==='all'?'Sin materiales.<br>Añade filamentos, impresoras y consumibles.':'Sin materiales con este filtro.'}</p></div>`;return;}const catIcon={filamento:'🧵',impresora:'🖨',consumible:'🔧',quimico:'🧪',otro:'📦'};$('materialTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Cat.</th><th>Material</th><th>Detalle</th><th>Precio</th><th>Stock</th><th>Mín.</th><th>Proveedor</th><th></th></tr></thead><tbody>${mats.map(m=>{const unit=m.cat==='filamento'?'g':'uds';return`<tr><td><span class="tag">${catIcon[m.cat]||'📦'} ${m.cat||'otro'}</span></td><td class="tdn">${m.name}</td><td style="font-size:11px;color:var(--muted)">${m.type||m.model||'—'}${m.color?' · '+m.color:''}</td><td>${m.price?fmt(m.price):'—'}</td><td><span class="badge ${m.stock<=m.minStock?'b-low':'b-ok'}">${m.stock} ${unit}</span></td><td style="color:var(--muted)">${m.minStock} ${unit}</td><td style="font-size:11px;color:var(--muted)">${m.supplier||'—'}</td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="openMaterialModal('${m.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteMaterial('${m.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;}
 async function deleteMaterial(id){if(!confirm('¿Eliminar?'))return;if(window.dbOps)await window.dbOps.deleteMaterial(id);toast('Material eliminado','red');}
 
 /* ════ FINANCE ════ */
