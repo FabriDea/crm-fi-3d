@@ -447,7 +447,7 @@ tr:hover td{background:var(--s2);}
       <div class="card" id="sec-printer">
         <div class="ct"><span class="dot"></span><span style="opacity:.4;font-size:10px">02</span>&nbsp;Impresora & Electricidad</div>
         <div class="fr">
-          <div class="field" id="f-printHours"><label>Tiempo impresión</label><div class="iw"><input type="number" id="printHours" value="3" min="0" step=".5" class="hu" oninput="calc()"><span class="unit">h</span></div></div>
+          <div class="field" id="f-printHours"><label>Tiempo impresión</label><div class="iw"><input type="number" id="printHours" value="180" min="0" step="1" class="hu" oninput="calc()"><span class="unit">min</span></div></div>
           <div class="field" id="f-printerWatts"><label>Consumo</label><div class="iw"><input type="number" id="printerWatts" value="200" min="1" step="10" class="hu" oninput="calc()"><span class="unit">W</span></div></div>
           <div class="field" id="f-kwhPrice"><label>Precio kWh</label><div class="iw"><input type="number" id="kwhPrice" value="0.18" min="0" step=".01" class="hu" oninput="calc()"><span class="unit">€</span></div></div>
           <div class="field" id="f-printerCost"><label>Coste impresora</label><div class="iw"><input type="number" id="printerCost" value="1200" min="0" step="10" class="hu" oninput="calc()"><span class="unit">€</span></div></div>
@@ -459,9 +459,9 @@ tr:hover td{background:var(--s2);}
         <div class="ct"><span class="dot"></span><span style="opacity:.4;font-size:10px">03</span>&nbsp;Mano de Obra</div>
         <div class="fr">
           <div class="field" id="f-laborRate"><label>Tarifa/hora</label><div class="iw"><input type="number" id="laborRate" value="15" min="0" step=".5" class="hu" oninput="calc()"><span class="unit">€/h</span></div></div>
-          <div class="field" id="f-laborHours"><label>Tiempo activo</label><div class="iw"><input type="number" id="laborHours" value="0.5" min="0" step=".25" class="hu" oninput="calc()"><span class="unit">h</span></div></div>
+          <div class="field" id="f-laborHours"><label>Tiempo activo</label><div class="iw"><input type="number" id="laborHours" value="30" min="0" step="1" class="hu" oninput="calc()"><span class="unit">min</span></div></div>
         </div>
-        <div class="field" id="f-postHours"><label>Post-proceso</label><div class="iw"><input type="number" id="postHours" value="0" min="0" step=".25" class="hu" oninput="calc()"><span class="unit">h</span></div></div>
+        <div class="field" id="f-postHours"><label>Post-proceso</label><div class="iw"><input type="number" id="postHours" value="0" min="0" step="1" class="hu" oninput="calc()"><span class="unit">min</span></div></div>
       </div>
       <div class="card" id="sec-shipping">
         <div class="ct"><span class="dot"></span><span style="opacity:.4;font-size:10px">04</span>&nbsp;Embalaje & Envío</div>
@@ -1181,10 +1181,10 @@ function calc(){
   const s=window._calcSettings[currentCalcMode]||{};
   const h=k=>s[k]===false;
   const fc=(vf('filamentWeight')/Math.max(vf('spoolWeight'),1))*vf('spoolPrice')*(1+(h('f-failureRate')?0:vf('failureRate'))/100);
-  const ec=h('f-kwhPrice')||h('f-printerWatts')||h('f-printHours')?0:(vf('printerWatts')/1000)*vf('printHours')*vf('kwhPrice');
-  const dc=h('f-printerCost')||h('f-printerLife')||h('f-printHours')?0:(vf('printerCost')/Math.max(vf('printerLife'),1))*vf('printHours');
-  const mc=h('f-maintenance')||h('f-printHours')?0:(vf('maintenance')/(365*8))*vf('printHours');
-  const lc=vf('laborRate')*((h('f-laborHours')?0:vf('laborHours'))+(h('f-postHours')?0:vf('postHours')));
+  const ec=h('f-kwhPrice')||h('f-printerWatts')||h('f-printHours')?0:(vf('printerWatts')/1000)*(vf('printHours')/60)*vf('kwhPrice');
+  const dc=h('f-printerCost')||h('f-printerLife')||h('f-printHours')?0:(vf('printerCost')/Math.max(vf('printerLife'),1))*(vf('printHours')/60);
+  const mc=h('f-maintenance')||h('f-printHours')?0:(vf('maintenance')/(365*8))*(vf('printHours')/60);
+  const lc=vf('laborRate')*((h('f-laborHours')?0:vf('laborHours')/60)+(h('f-postHours')?0:vf('postHours')/60));
   const pk=h('f-packCost')?0:vf('packCost'),sh=h('f-shipCost')?0:vf('shipCost');
   let cc=0;
   ccList.forEach(({id})=>{const v=getCCVal(id);cc+=v;const el=$(`cc-comp-${id}`);if(el)el.textContent=v>0?`→ ${fmt(v)} / pieza`:'';const ar=$(`cc-ar-val-${id}`);if(ar){const t=parseFloat($(`cc-t-${id}`)?.value)||0;const q=Math.max(parseFloat($(`cc-q-${id}`)?.value)||1,1);ar.textContent=fmt(t/q);}});
@@ -1230,7 +1230,7 @@ function calc(){
 function addCC(){const id=++ccId;ccList.push({id});const w=document.createElement('div');w.className='cci';w.id=`cc-${id}`;w.innerHTML=`<div class="cchd"><input class="ccni" type="text" id="cc-n-${id}" placeholder="Ej: IA diseño…" oninput="calc()"><button style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);width:27px;height:27px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;" onclick="removeCC(${id})">×</button></div><div class="cmt"><button class="cmb active" data-mode="direct" onclick="swCC(${id},'direct')">💰 Por pieza</button><button class="cmb" data-mode="amort" onclick="swCC(${id},'amort')">📊 Repartir</button></div><div class="cpp vis" id="cc-pd-${id}"><div class="iw"><input type="number" id="cc-d-${id}" value="0" min="0" step=".01" class="hu" oninput="calc()"><span class="unit">€</span></div><div class="ccomp" id="cc-comp-${id}"></div></div><div class="cpp" id="cc-pa-${id}"><div class="cag"><div><label style="margin-bottom:3px">Total pagado</label><div class="iw"><input type="number" id="cc-t-${id}" value="0" min="0" step=".01" class="hu" oninput="calc()"><span class="unit">€</span></div></div><div><label style="margin-bottom:3px">Nº piezas</label><div class="iw"><input type="number" id="cc-q-${id}" value="10" min="1" step="1" class="hu" oninput="calc()"><span class="unit">uds</span></div></div></div><div class="car"><span>Por pieza:</span><span id="cc-ar-val-${id}">—</span></div></div>`;$('customCosts').appendChild(w);calc();$(`cc-n-${id}`).focus();}
 function swCC(id,mode){document.querySelectorAll(`#cc-${id} .cmb`).forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));$(`cc-pd-${id}`).classList.toggle('vis',mode==='direct');$(`cc-pa-${id}`).classList.toggle('vis',mode==='amort');calc();}
 function removeCC(id){ccList=ccList.filter(c=>c.id!==id);const el=$(`cc-${id}`);if(el){el.style.cssText='opacity:0;transform:translateY(-5px);transition:.18s';setTimeout(()=>el.remove(),200);}calc();}
-function resetCalc(){const d={filamentWeight:50,spoolPrice:22,spoolWeight:1000,printHours:3,printerWatts:200,kwhPrice:.18,printerCost:1200,printerLife:5000,maintenance:80,laborRate:15,laborHours:.5,postHours:0,packCost:1.5,shipCost:4};Object.entries(d).forEach(([k,v])=>{if($(k))$(k).value=v;});$('filamentType').value='pla+';$('failureRate').value=5;$('fRV').textContent='5%';$('platformFee').value=6.5;$('pfV').textContent='6.5%';$('margin').value=100;$('mgV').textContent='100%';ccList=[];$('customCosts').innerHTML='';calc();}
+function resetCalc(){const d={filamentWeight:50,spoolPrice:22,spoolWeight:1000,printHours:180,printerWatts:200,kwhPrice:.18,printerCost:1200,printerLife:5000,maintenance:80,laborRate:15,laborHours:30,postHours:0,packCost:1.5,shipCost:4};Object.entries(d).forEach(([k,v])=>{if($(k))$(k).value=v;});$('filamentType').value='pla+';$('failureRate').value=5;$('fRV').textContent='5%';$('platformFee').value=6.5;$('pfV').textContent='6.5%';$('margin').value=100;$('mgV').textContent='100%';ccList=[];$('customCosts').innerHTML='';calc();}
 
 /* ════ PDF — SOLO IVA AL CLIENTE ════ */
 function generatePDF(type, orderData){
