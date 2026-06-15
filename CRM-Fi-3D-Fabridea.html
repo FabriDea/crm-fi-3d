@@ -380,7 +380,7 @@ tr:hover td{background:var(--s2);}
 <div class="page active" id="page-dashboard">
   <div class="ph">
     <div><div class="ph-title">Dashboard</div><div class="ph-sub">Resumen en tiempo real · CRM Fi 3D</div></div>
-    <button class="btn btn-primary" onclick="go('calc')">＋ Nueva pieza</button>
+    <button class="btn btn-primary" onclick="go('calc')">＋ Nuevo pedido</button>
   </div>
   <div class="g4" style="margin-bottom:12px">
     <div class="stat"><div class="sv2" id="d-orders" style="color:var(--accent)">0</div><div class="sl">Pedidos</div></div>
@@ -554,7 +554,10 @@ tr:hover td{background:var(--s2);}
           <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:7px;">Desglose</div>
           <div id="bkBars"></div>
         </div>
-        <div style="margin-top:12px;"><button class="btn btn-ghost btn-full btn-sm" onclick="resetCalc()">↺ Restablecer</button></div>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <button class="btn btn-purple btn-full btn-sm" onclick="openSaveModal()">💾 Guardar pedido</button>
+          <button class="btn btn-ghost btn-full btn-sm" onclick="resetCalc()">↺ Restablecer</button>
+        </div>
       </div>
     </div>
   </div>
@@ -998,7 +1001,7 @@ function initListeners(){
     updateBadges();
   },()=>setSyncStatus('err'));
   onSnapshot(collection(db,'clients'),snap=>{window._data.clients=snap.docs.map(d=>({id:d.id,...d.data()}));if(document.getElementById('page-clients').classList.contains('active'))renderClients();updateBadges();});
-  onSnapshot(collection(db,'materials'),snap=>{window._data.materials=snap.docs.map(d=>({id:d.id,...d.data()}));if(document.getElementById('page-materials').classList.contains('active'))renderMaterials();populateFilamentInventory();updateBadges();});
+  onSnapshot(collection(db,'materials'),snap=>{window._data.materials=snap.docs.map(d=>({id:d.id,...d.data()}));if(document.getElementById('page-materials').classList.contains('active'))renderMaterials();if(document.getElementById('page-dashboard').classList.contains('active'))renderDashboard();populateFilamentInventory();updateBadges();});
   onSnapshot(query(collection(db,'expenses'),orderBy('createdAt','desc')),snap=>{window._data.expenses=snap.docs.map(d=>({id:d.id,...d.data()}));if(document.getElementById('page-finance').classList.contains('active'))renderFinance();});
   onSnapshot(doc(db,'settings','main'),snap=>{
     if(snap.exists()){
