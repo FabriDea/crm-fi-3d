@@ -758,9 +758,23 @@ tr:hover td{background:var(--s2);}
     </div>
     <div class="field"><label>Notas</label><textarea id="m-notes" placeholder="Color, personalización…" style="min-height:72px;"></textarea></div>
   </div>
-  <div style="background:rgba(255,107,53,.07);border:1px solid rgba(255,107,53,.2);border-radius:8px;padding:9px 13px;margin:10px 0;display:flex;justify-content:space-between;align-items:center;">
-    <span style="font-size:11px;color:var(--muted)">Total (<span id="mpQtyLbl">1</span> uds)</span>
-    <span style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--a2);" id="mpTotal">—</span>
+  <div style="background:rgba(255,107,53,.07);border:1px solid rgba(255,107,53,.2);border-radius:8px;padding:9px 13px;margin:10px 0;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:11px;color:var(--muted)">Total estimado (<span id="mpQtyLbl">1</span> uds)</span>
+      <span style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--a2);" id="mpTotal">—</span>
+    </div>
+    <div class="fr" style="margin-bottom:0">
+      <div class="field" style="margin-bottom:0">
+        <label>Precio de venta/u (€)</label>
+        <div class="iw"><input type="number" id="m-salePrice" min="0" step=".01" placeholder="Dejar vacío = precio calculado" class="hu" oninput="onSalePriceInput()"><span class="unit">€</span></div>
+      </div>
+      <div class="field" style="margin-bottom:0;display:flex;flex-direction:column;justify-content:flex-end;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
+          <input type="checkbox" id="m-forMe" onchange="toggleForMe()" style="width:16px;height:16px;accent-color:var(--accent)">
+          <span style="font-size:12px">Pieza para mí (venta: 0€)</span>
+        </label>
+      </div>
+    </div>
   </div>
   <div class="mfooter">
     <button class="btn btn-ghost btn-sm" onclick="closeModal('saveModal')">Cancelar</button>
@@ -804,6 +818,10 @@ tr:hover td{background:var(--s2);}
   <div class="fr">
     <div class="field"><label>Coste/unidad (€)</label><div class="iw"><input type="number" id="eo-cost" min="0" step=".01" class="hu"><span class="unit">€</span></div></div>
     <div class="field"><label>Precio venta/u (€)</label><div class="iw"><input type="number" id="eo-price" min="0" step=".01" class="hu"><span class="unit">€</span></div></div>
+  </div>
+  <div class="fr">
+    <div class="field"><label>Gramos reales usados/u</label><div class="iw"><input type="number" id="eo-grams" min="0" step="1" class="hu" placeholder="Dejar vacío si no cambian"><span class="unit">g</span></div></div>
+    <div class="field"></div>
   </div>
   <div class="fr">
     <div class="field"><label>Nº Presupuesto</label><input type="text" id="eo-budget"></div>
@@ -1430,14 +1448,26 @@ function openSaveModal(){
   if(!pn){$('pieceName').style.borderColor='var(--red)';toast('El nombre de la pieza es obligatorio','red');return;}
   const rows=[['Filamento',C.fc],['Electricidad',C.ec],['Amort.',C.dc],['M.obra',C.lc],['Embalaje',C.pk],['Envío',C.sh]];
   if(C.cc>0)rows.push(['Adicionales',C.cc]);
-  $('modalSummary').innerHTML=`<div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">${pn}</div>`+rows.map(([l,v])=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:var(--soft)"><span>${l}</span><span>${fmt(v)}</span></div>`).join('')+`<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;padding:5px 0 0;border-top:1px solid var(--border);margin-top:3px;color:var(--accent)"><span>Coste</span><span>${fmt(C.total)}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--a2)"><span>Precio venta</span><span>${fmt(C.sp)}</span></div>`;
+  $('modalSummary').innerHTML=`<div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">${pn}</div>`+rows.map(([l,v])=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;color:var(--soft)"><span>${l}</span><span>${fmt(v)}</span></div>`).join('')+`<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;padding:5px 0 0;border-top:1px solid var(--border);margin-top:3px;color:var(--accent)"><span>Coste</span><span>${fmt(C.total)}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:var(--a2)"><span>Precio venta calculado</span><span>${fmt(C.sp)}</span></div>`;
   const sel=$('m-clientSel');sel.innerHTML='<option value="">— Nuevo cliente —</option>';
   window._data.clients.forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.name} ${c.apellidos||''}</option>`);
   $('m-date').value=today();selectedFile=null;$('fileName').textContent='';$('fileUploadArea').classList.remove('has-file');
+  $('m-salePrice').value='';$('m-forMe').checked=false;
   updateModalTotal();$('saveModal').classList.add('open');$('m-client').focus();
 }
+function toggleForMe(){
+  const checked=$('m-forMe').checked;
+  $('m-salePrice').value=checked?'0':'';
+  $('m-salePrice').disabled=checked;
+  updateModalTotal();
+}
+function onSalePriceInput(){
+  const v=parseFloat($('m-salePrice').value);
+  $('m-forMe').checked=(!isNaN(v)&&v===0);
+  updateModalTotal();
+}
 function prefillClient(){const id=$('m-clientSel').value;if(!id)return;const cl=window._data.clients.find(c=>c.id===id);if(cl){$('m-client').value=cl.name||'';$('m-apellidos').value=cl.apellidos||'';$('m-phone').value=cl.phone||'';$('m-email').value=cl.email||'';}}
-function updateModalTotal(){const C=window._C;if(!C)return;const q=Math.max(parseInt($('m-qty').value)||1,1);$('mpQtyLbl').textContent=q;$('mpTotal').textContent=fmt(C.spf*q);}
+function updateModalTotal(){const C=window._C;if(!C)return;const q=Math.max(parseInt($('m-qty').value)||1,1);$('mpQtyLbl').textContent=q;const customPrice=$('m-salePrice').value;const sp=customPrice!==''?parseFloat(customPrice)||0:C.spf;$('mpTotal').textContent=fmt(sp*q);}
 async function buildOrderObject(){
   const C=window._C;if(!C)return null;
   const pn=$('pieceName').value.trim();
@@ -1452,7 +1482,9 @@ async function buildOrderObject(){
   const filType=$('filamentType').value;
   const filGramsPerUnit=vf('filamentWeight');
   const filamentUsed={materialId:filType.startsWith('inv:')?filType.slice(4):null,gramsPerUnit:filGramsPerUnit,totalGrams:fmtR(filGramsPerUnit*q)};
-  return{pieceName:pn,code,client:clientName,apellidos:$('m-apellidos').value.trim(),phone,email:$('m-email').value.trim(),qty:q,status:$('m-status').value,date:$('m-date').value,notes:$('m-notes').value.trim(),fileName:selectedFile?selectedFile.name:'',costPerPiece:fmtR(C.total),pricePerPiece:fmtR(C.sp),priceWithFee:fmtR(C.spf),totalOrder:fmtR(C.spf*q),margin:C.mg,platformFee:C.pf,budgetNum:'',invoiceNum:'',filamentUsed,printMinutes:vf('printHours'),laborMinutes:vf('laborHours'),postMinutes:vf('postHours'),stockDeducted:false,breakdown:{fc:fmtR(C.fc),ec:fmtR(C.ec),dc:fmtR(C.dc),mc:fmtR(C.mc),lc:fmtR(C.lc),pk:fmtR(C.pk),sh:fmtR(C.sh),cc:fmtR(C.cc)}};
+  const customPriceVal=$('m-salePrice').value;
+  const salePrice=customPriceVal!==''?parseFloat(customPriceVal)||0:C.spf;
+  return{pieceName:pn,code,client:clientName,apellidos:$('m-apellidos').value.trim(),phone,email:$('m-email').value.trim(),qty:q,status:$('m-status').value,date:$('m-date').value,notes:$('m-notes').value.trim(),fileName:selectedFile?selectedFile.name:'',costPerPiece:fmtR(C.total),pricePerPiece:fmtR(salePrice),priceWithFee:fmtR(salePrice),totalOrder:fmtR(salePrice*q),margin:C.mg,platformFee:C.pf,budgetNum:'',invoiceNum:'',filamentUsed,printMinutes:vf('printHours'),laborMinutes:vf('laborHours'),postMinutes:vf('postHours'),stockDeducted:false,breakdown:{fc:fmtR(C.fc),ec:fmtR(C.ec),dc:fmtR(C.dc),mc:fmtR(C.mc),lc:fmtR(C.lc),pk:fmtR(C.pk),sh:fmtR(C.sh),cc:fmtR(C.cc)}};
 }
 async function saveOrder(){
   const order=await buildOrderObject();if(!order)return;
@@ -1582,7 +1614,7 @@ function showDocModal(type,order,existing){
     document.body.appendChild(div);
   });
 }
-function openEditOrder(id){const o=window._data.orders.find(x=>x.id===id);if(!o)return;$('eo-id').value=id;$('eo-code-display').textContent=o.code||'';$('eo-piece').value=o.pieceName||'';$('eo-status').value=o.status||'solicitud';$('eo-client').value=o.client||'';$('eo-apellidos').value=o.apellidos||'';$('eo-phone').value=o.phone||'';$('eo-email').value=o.email||'';$('eo-qty').value=o.qty||1;$('eo-date').value=o.date||today();$('eo-cost').value=o.costPerPiece||0;$('eo-price').value=o.pricePerPiece||0;$('eo-budget').value=o.budgetNum||'';$('eo-invoice').value=o.invoiceNum||'';$('eo-notes').value=o.notes||'';
+function openEditOrder(id){const o=window._data.orders.find(x=>x.id===id);if(!o)return;$('eo-id').value=id;$('eo-code-display').textContent=o.code||'';$('eo-piece').value=o.pieceName||'';$('eo-status').value=o.status||'solicitud';$('eo-client').value=o.client||'';$('eo-apellidos').value=o.apellidos||'';$('eo-phone').value=o.phone||'';$('eo-email').value=o.email||'';$('eo-qty').value=o.qty||1;$('eo-date').value=o.date||today();$('eo-cost').value=o.costPerPiece||0;$('eo-price').value=o.pricePerPiece||0;$('eo-budget').value=o.budgetNum||'';$('eo-invoice').value=o.invoiceNum||'';$('eo-notes').value=o.notes||'';$('eo-grams').value='';
   // Mostrar archivo actual si existe
   const fc=$('eo-file-current');
   if(fc){if(o.fileUrl&&o.fileName){fc.innerHTML=`📁 <a href="${o.fileUrl}" target="_blank" style="color:var(--accent)">${o.fileName}</a> <span style="color:var(--muted)">(guardado en la nube)</span>`;}else{fc.textContent='Sin archivo adjunto.';}}
@@ -1594,10 +1626,28 @@ function handleEditFileSelect(input){_editSelectedFile=input.files[0];if(_editSe
 
 async function updateOrder(){const id=$('eo-id').value;if(!id)return;const pn=$('eo-piece').value.trim();if(!pn){toast('Nombre obligatorio','red');return;}const qty=Math.max(parseInt($('eo-qty').value)||1,1);const price=parseFloat($('eo-price').value)||0;const data={pieceName:pn,client:$('eo-client').value.trim(),apellidos:$('eo-apellidos').value.trim(),phone:$('eo-phone').value.trim(),email:$('eo-email').value.trim(),qty,date:$('eo-date').value,status:$('eo-status').value,budgetNum:$('eo-budget').value.trim(),invoiceNum:$('eo-invoice').value.trim(),costPerPiece:parseFloat($('eo-cost').value)||0,pricePerPiece:price,totalOrder:fmtR(price*qty),notes:$('eo-notes').value.trim()};
   const existing=window._data.orders.find(o=>o.id===id);
+  // Handle grams correction (pieza fallida)
+  const newGramsVal=$('eo-grams').value;
+  if(newGramsVal!==''&&existing&&existing.filamentUsed){
+    const newGramsPerUnit=parseFloat(newGramsVal)||0;
+    const newTotalGrams=fmtR(newGramsPerUnit*qty);
+    // If stock was already deducted, adjust the difference in inventory
+    if(existing.stockDeducted&&existing.filamentUsed.materialId){
+      const mat=(window._data.materials||[]).find(m=>m.id===existing.filamentUsed.materialId);
+      if(mat){
+        const oldTotal=existing.filamentUsed.totalGrams||0;
+        const diff=newTotalGrams-oldTotal; // positive = used more, negative = used less (returned to stock)
+        const newStock=Math.max((mat.stock||0)-diff,0);
+        if(window.dbOps)await window.dbOps.updateMaterial(mat.id,{stock:fmtR(newStock)});
+        toast(`Stock ajustado: ${diff>=0?'-':'+'} ${Math.abs(diff)}g`,'green');
+      }
+    }
+    data.filamentUsed={...existing.filamentUsed,gramsPerUnit:newGramsPerUnit,totalGrams:newTotalGrams};
+  }
   if(existing&&!existing.stockDeducted&&PRODUCTION_STATUSES.includes(data.status)){
-    if(await deductFilamentStock({...existing,qty}))data.stockDeducted=true;
+    if(await deductFilamentStock({...existing,...data,qty}))data.stockDeducted=true;
   }else if(existing&&existing.stockDeducted&&!PRODUCTION_STATUSES.includes(data.status)){
-    if(await restoreFilamentStock(existing))data.stockDeducted=false;
+    if(await restoreFilamentStock({...existing,...(data.filamentUsed?{filamentUsed:data.filamentUsed}:{})}))data.stockDeducted=false;
   }
   if(window.dbOps)await window.dbOps.updateOrder(id,data);
   // Subir nuevo archivo si se seleccionó uno
