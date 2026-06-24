@@ -340,6 +340,7 @@ tr:hover td{background:var(--s2);}
   </button>
   <div class="topbar-brand">CRM Fi <span>3D</span></div>
   <div class="topbar-spacer"></div>
+  <button id="stockAlertBtn" onclick="go('materials')" title="Stock bajo" style="display:none;background:var(--red);border:none;border-radius:100px;padding:4px 10px;font-size:11px;color:#fff;cursor:pointer;font-weight:700;gap:4px;align-items:center;">⚠️ <span id="stockAlertCount">0</span> stock bajo</button>
   <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">
     <span class="theme-icon" id="themeIcon">🌙</span>
     <span id="themeLabel">Oscuro</span>
@@ -396,6 +397,10 @@ tr:hover td{background:var(--s2);}
   <div class="g2" style="margin-bottom:12px">
     <div class="card"><div class="ct"><span class="dot"></span>Stock de filamentos 🧵</div><div id="d-filstock"></div></div>
     <div class="card"><div class="ct"><span class="dot"></span>Stock bajo ⚠️</div><div id="d-lowstock"></div></div>
+  </div>
+  <div class="g2" style="margin-bottom:12px">
+    <div class="card"><div class="ct"><span class="dot"></span>🖨️ Impresora — horas acumuladas</div><div id="d-printer-hours"></div></div>
+    <div class="card"><div class="ct"><span class="dot"></span>📅 Esta semana</div><div id="d-week-stats"></div></div>
   </div>
   <div class="g2">
     <div class="card"><div class="ct"><span class="dot"></span>Resumen financiero</div><div id="d-finsummary"></div></div>
@@ -569,9 +574,12 @@ tr:hover td{background:var(--s2);}
   <div class="ph">
     <div><div class="ph-title">Pedidos</div><div class="ph-sub">Registro y seguimiento completo</div></div>
     <div class="ph-actions">
+      <button class="btn btn-ghost btn-sm" onclick="setOrdersTab('catalog',this)" id="tab-catalog-btn">📚 Catálogo</button>
       <button class="btn btn-excel btn-sm" onclick="exportOrdersXL()">📊 Excel</button>
     </div>
   </div>
+  <!-- Orders tab -->
+  <div id="orders-tab-orders">
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
     <input class="search-bar" id="orderSearch" placeholder="🔍 Buscar…" oninput="renderOrders()" style="flex:1;min-width:140px;">
     <select id="orderStatusSel" onchange="setOF(this.value)" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:7px 10px;cursor:pointer;font-family:inherit;">
@@ -597,6 +605,15 @@ tr:hover td{background:var(--s2);}
     </select>
   </div>
   <div id="orderTable"></div>
+  </div>
+  <!-- Catalog tab -->
+  <div id="orders-tab-catalog" style="display:none">
+    <div class="ph" style="margin-bottom:14px;">
+      <div><div style="font-size:13px;color:var(--muted)">Piezas guardadas para reutilizar. Pulsa ▶ para lanzar un pedido rápido.</div></div>
+      <button class="btn btn-primary btn-sm" onclick="openCatalogModal()">＋ Nueva pieza</button>
+    </div>
+    <div id="catalogGrid"></div>
+  </div>
 </div>
 
 <!-- CLIENTES -->
@@ -643,6 +660,7 @@ tr:hover td{background:var(--s2);}
     <div class="ph-actions">
       <button class="btn btn-primary btn-sm" onclick="openExpenseModal()">＋ Añadir gasto</button>
       <button class="btn btn-excel btn-sm" onclick="exportFinanceXL()">📊 Excel</button>
+      <button class="btn btn-blue btn-sm" onclick="generateMonthlyReport()">📄 Informe mensual</button>
     </div>
   </div>
   <div class="g3" style="margin-bottom:12px;">
@@ -650,6 +668,7 @@ tr:hover td{background:var(--s2);}
     <div class="stat"><div class="sv2" id="f-expenses" style="color:var(--red)">0 €</div><div class="sl">Gastos totales</div></div>
     <div class="stat"><div class="sv2" id="f-profit" style="color:var(--yellow)">0 €</div><div class="sl">Beneficio neto</div></div>
   </div>
+  <div class="card" style="margin-bottom:12px;"><div class="ct"><span class="dot"></span>📈 Evolución mensual (últimos 6 meses)</div><div id="f-monthly-chart" style="padding:8px 0;"></div></div>
   <div class="card" style="margin-bottom:12px;"><div class="ct"><span class="dot"></span>Costes producción (piezas en proceso)</div><div id="productionCostsTable"></div></div>
   <div class="card"><div class="ct"><span class="dot"></span>Gastos adicionales</div><div id="expenseTable"></div></div>
 </div>
@@ -1027,6 +1046,29 @@ tr:hover td{background:var(--s2);}
 </div>
 </div>
 
+<!-- CATALOG MODAL -->
+<div class="mo" id="catalogModal">
+<div class="modal" style="max-width:500px;">
+  <div class="mhd"><div class="mtitle" id="cat-modal-title">📚 Nueva pieza del catálogo</div><button class="mclose" onclick="closeModal('catalogModal')">✕</button></div>
+  <input type="hidden" id="cat-id">
+  <div class="field"><label>Nombre de la pieza <span class="req">*</span></label><input type="text" id="cat-name" placeholder="Ej: Soporte para filamento"></div>
+  <div class="fr">
+    <div class="field"><label>Filamento usado (g)</label><div class="iw"><input type="number" id="cat-grams" value="50" min="0" step="1" class="hu"><span class="unit">g</span></div></div>
+    <div class="field"><label>Tiempo impresión (min)</label><div class="iw"><input type="number" id="cat-minutes" value="60" min="0" step="1" class="hu"><span class="unit">min</span></div></div>
+  </div>
+  <div class="fr">
+    <div class="field"><label>Coste producción/u (€)</label><div class="iw"><input type="number" id="cat-cost" value="0" min="0" step="0.01" class="hu"><span class="unit">€</span></div></div>
+    <div class="field"><label>Precio venta/u (€)</label><div class="iw"><input type="number" id="cat-price" value="0" min="0" step="0.01" class="hu"><span class="unit">€</span></div></div>
+  </div>
+  <div class="field"><label>Material</label><input type="text" id="cat-material" placeholder="PLA+ Negro"></div>
+  <div class="field"><label>Notas / descripción</label><textarea id="cat-notes" placeholder="Características, variantes, cliente habitual…"></textarea></div>
+  <div class="mfooter">
+    <button class="btn btn-ghost btn-sm" onclick="closeModal('catalogModal')">Cancelar</button>
+    <button class="btn btn-primary" onclick="saveCatalogItem()">✓ Guardar</button>
+  </div>
+</div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- FIREBASE -->
@@ -1084,7 +1126,7 @@ function setSyncStatus(state){
   else{dot.className='sync-dot err';txt.textContent='Sin conexión';}
 }
 
-window._data={orders:[],clients:[],materials:[],expenses:[],settings:{}};
+window._data={orders:[],clients:[],materials:[],expenses:[],catalog:[],settings:{}};
 
 function initListeners(){
   onSnapshot(query(collection(db,'orders'),orderBy('createdAt','desc')),snap=>{
@@ -1098,6 +1140,7 @@ function initListeners(){
   onSnapshot(collection(db,'clients'),snap=>{window._data.clients=snap.docs.map(d=>({id:d.id,...d.data()}));if(document.getElementById('page-clients').classList.contains('active'))renderClients();updateBadges();});
   onSnapshot(collection(db,'materials'),snap=>{window._data.materials=snap.docs.map(d=>({id:d.id,...d.data()}));if(document.getElementById('page-materials').classList.contains('active'))renderMaterials();if(document.getElementById('page-dashboard').classList.contains('active'))renderDashboard();populateFilamentInventory();updateBadges();});
   onSnapshot(query(collection(db,'expenses'),orderBy('createdAt','desc')),snap=>{window._data.expenses=snap.docs.map(d=>({id:d.id,...d.data()}));if(document.getElementById('page-finance').classList.contains('active'))renderFinance();});
+  onSnapshot(collection(db,'catalog'),snap=>{window._data.catalog=snap.docs.map(d=>({id:d.id,...d.data()}));if(document.getElementById('orders-tab-catalog')?.style.display!=='none')renderCatalog();});
   onSnapshot(doc(db,'settings','main'),snap=>{
     if(snap.exists()){
       const d=snap.data();window._data.settings=d;
@@ -1135,6 +1178,9 @@ window.dbOps={
   async addExpense(data){return await addDoc(collection(db,'expenses'),{...data,createdAt:serverTimestamp()});},
   async deleteExpense(id){await deleteDoc(doc(db,'expenses',id));},
   async saveSettings(data){await setDoc(doc(db,'settings','main'),data,{merge:true});},
+  async addCatalogItem(data){return await addDoc(collection(db,'catalog'),{...data,createdAt:serverTimestamp()});},
+  async updateCatalogItem(id,data){await setDoc(doc(db,'catalog',id),data,{merge:true});},
+  async deleteCatalogItem(id){await deleteDoc(doc(db,'catalog',id));},
 };
 initListeners();
 </script>
@@ -1224,7 +1270,7 @@ function go(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove(
 function toggleSidebar(){$('sidebar').classList.toggle('open');$('overlay').classList.toggle('open');}
 function closeSidebar(){$('sidebar').classList.remove('open');$('overlay').classList.remove('open');}
 function closeModal(id){$(id).classList.remove('open');}
-function updateBadges(){const d=window._data;$('nb-orders').textContent=d.orders.length;$('nb-clients').textContent=d.clients.length;$('nb-materials').textContent=d.materials.length;}
+function updateBadges(){const d=window._data;$('nb-orders').textContent=d.orders.length;$('nb-clients').textContent=d.clients.length;$('nb-materials').textContent=d.materials.length;const lowCount=(d.materials||[]).filter(m=>m.stock<=m.minStock).length;const btn=$('stockAlertBtn');if(btn){btn.style.display=lowCount>0?'flex':'none';$('stockAlertCount').textContent=lowCount;}}
 
 /* ════ LOGO ════ */
 function handleLogoUpload(input){
@@ -1320,6 +1366,7 @@ function saveTaxes(){
 /* ════ DASHBOARD ════ */
 function renderDashboard(){
   const {orders,clients,materials,expenses}=window._data;
+  const s=window._data.settings||{};
   const revenue=orders.reduce((a,o)=>a+(o.totalOrder||0),0);
   const cost=orders.reduce((a,o)=>a+(o.costPerPiece||0)*(o.qty||1),0);
   const expTotal=expenses.reduce((a,e)=>a+(e.amount||0),0);
@@ -1336,6 +1383,39 @@ function renderDashboard(){
   const filTop=filaments.slice(0,4);
   $('d-filstock').innerHTML=filTop.length?filTop.map(m=>{const label=`${m.type||'?'}${m.color?' · '+m.color:''}`;const low=m.stock<=m.minStock;return`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;color:var(--text)">${label}</span><span class="badge ${low?'b-low':'b-ok'}">${m.stock||0} g</span></div>`;}).join('')+(filaments.length>4?`<button class="btn btn-ghost btn-sm btn-full" style="margin-top:8px" onclick="go('materials')">Ver todos (${filaments.length}) →</button>`:''):'<p class="hint">Sin filamentos en inventario.</p>';
   $('d-finsummary').innerHTML=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Ingresos</span><span style="color:var(--accent)">${fmt(revenue)}</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Costes prod.</span><span style="color:var(--red)">${fmt(cost)}</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Gastos</span><span style="color:var(--red)">${fmt(expTotal)}</span></div><div style="display:flex;justify-content:space-between;padding:9px 0 3px;font-size:13px;font-weight:600;"><span>Beneficio</span><span style="color:var(--yellow)">${fmt(revenue-cost-expTotal)}</span></div>`;
+  // Printer hours & maintenance alerts
+  const totalPrintMin=orders.reduce((a,o)=>a+(o.printMinutes||0)*(o.qty||1),0);
+  const totalPrintH=fmtR(totalPrintMin/60);
+  const printerLife=s.defPrinterLife||5000;
+  const pct=Math.min((totalPrintH/printerLife)*100,100);
+  const alertColor=pct>80?'var(--red)':pct>60?'var(--yellow)':'var(--accent)';
+  const maintAlerts=[];
+  if(totalPrintH>50&&totalPrintH%200<5)maintAlerts.push('Revisar lubricación de ejes');
+  if(totalPrintH>100&&totalPrintH%500<5)maintAlerts.push('Inspeccionar hotend y boquilla');
+  if(totalPrintH>200&&totalPrintH%1000<5)maintAlerts.push('Revisar correas y extrusor');
+  if(pct>80)maintAlerts.push('⚠️ Impresora cerca del fin de vida útil estimada');
+  $('d-printer-hours').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+      <span style="font-size:22px;font-weight:800;color:${alertColor}">${totalPrintH}h</span>
+      <span style="font-size:11px;color:var(--muted)">de ${printerLife}h estimadas</span>
+    </div>
+    <div style="background:var(--border);border-radius:100px;height:6px;overflow:hidden;margin-bottom:10px;">
+      <div style="height:100%;width:${pct.toFixed(1)}%;background:${alertColor};border-radius:100px;transition:width .5s;"></div>
+    </div>
+    ${maintAlerts.length?maintAlerts.map(a=>`<div style="font-size:11px;color:var(--yellow);padding:3px 0;">⚠️ ${a}</div>`).join(''):
+    `<p class="hint" style="color:var(--accent)">✓ Sin alertas de mantenimiento.</p>`}
+    <div style="font-size:10px;color:var(--muted);margin-top:6px;">Total piezas registradas: ${orders.length} · ${orders.filter(o=>o.printMinutes).length} con tiempo de impresión</div>`;
+  // Esta semana
+  const now=new Date();const weekAgo=new Date(now-7*864e5);
+  const weekOrders=orders.filter(o=>o.date&&new Date(o.date)>=weekAgo);
+  const weekMin=weekOrders.reduce((a,o)=>a+(o.printMinutes||0)*(o.qty||1),0);
+  const weekGrams=weekOrders.reduce((a,o)=>a+((o.filamentUsed?.gramsPerUnit||0)*(o.qty||1)),0);
+  const weekRevenue=weekOrders.reduce((a,o)=>a+(o.totalOrder||0),0);
+  $('d-week-stats').innerHTML=`
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Pedidos</span><span style="font-weight:600">${weekOrders.length}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Horas impresas</span><span style="font-weight:600;color:var(--accent)">${fmtR(weekMin/60)}h</span></div>
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Filamento usado</span><span style="font-weight:600;color:var(--a3)">${fmtR(weekGrams)}g</span></div>
+    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;"><span style="color:var(--soft)">Facturado</span><span style="font-weight:600;color:var(--a2)">${fmt(weekRevenue)}</span></div>`;
 }
 
 /* ════ CALCULATOR ════ */
@@ -1855,7 +1935,23 @@ let editingClientId=null;
 function openClientModal(id){editingClientId=id||null;if(id){const c=window._data.clients.find(x=>x.id===id)||{};$('clientModalTitle').textContent='✏️ Editar cliente';$('cm-id').value=id;$('cm-name').value=c.name||'';$('cm-apellidos').value=c.apellidos||'';$('cm-phone').value=c.phone||'';$('cm-email').value=c.email||'';$('cm-notes').value=c.notes||'';$('cm-status').value=c.status||'activo';}else{$('clientModalTitle').textContent='👤 Nuevo cliente';['cm-id','cm-name','cm-apellidos','cm-phone','cm-email','cm-notes'].forEach(f=>$(f).value='');$('cm-status').value='activo';}$('clientModal').classList.add('open');}
 async function saveClient(){const name=$('cm-name').value.trim(),apellidos=$('cm-apellidos').value.trim(),phone=$('cm-phone').value.trim();if(!name||!apellidos||!phone){toast('Nombre, apellidos y teléfono son obligatorios','red');return;}const obj={name,apellidos,phone,email:$('cm-email').value.trim(),notes:$('cm-notes').value.trim(),status:$('cm-status').value};if(editingClientId&&window.dbOps)await window.dbOps.updateClient(editingClientId,obj);else if(window.dbOps){const cc=await getNextCode('client');obj.code=cc;await window.dbOps.addClient(obj);}closeModal('clientModal');toast('✓ Cliente guardado','green');}
 function renderClients(){let clients=window._data.clients;const q=($('clientSearch')?.value||'').toLowerCase();if(q)clients=clients.filter(c=>(c.name+' '+(c.apellidos||'')+c.phone+(c.email||'')).toLowerCase().includes(q));const orders=window._data.orders;if(!clients.length){$('clientGrid').innerHTML=`<div class="empty"><div class="ei">👤</div><p>Sin clientes aún.</p></div>`;return;}$('clientGrid').innerHTML=`<div class="client-grid">${clients.map(c=>{const co=orders.filter(o=>o.client===c.name);const rev=co.reduce((a,o)=>a+(o.totalOrder||0),0);return`<div class="cc-card" onclick="showClientDetail('${c.id}')"><div class="cc-av">${(c.name||'?')[0].toUpperCase()}</div><div class="cc-nm">${c.name} ${c.apellidos||''}</div><div class="cc-mt">${c.phone||''}</div><div style="font-size:10px;color:var(--a3);margin-top:2px;">${c.code||''}</div><div class="cc-sts"><div class="cc-st"><strong>${co.length}</strong> pedidos</div><div class="cc-st"><strong style="color:var(--a2)">${rev.toFixed(0)}€</strong></div></div></div>`;}).join('')}</div>`;}
-function showClientDetail(id){const c=window._data.clients.find(x=>x.id===id);if(!c)return;const orders=window._data.orders.filter(o=>o.client===c.name);const rev=orders.reduce((a,o)=>a+(o.totalOrder||0),0);$('cdm-title').textContent=`👤 ${c.name} ${c.apellidos||''}`;$('cdm-body').innerHTML=`<div style="margin-bottom:12px;"><span class="code-badge">${c.code||'Sin código'}</span></div><div class="g2" style="margin-bottom:12px"><div class="stat"><div class="sv2" style="color:var(--a3)">${orders.length}</div><div class="sl">Pedidos</div></div><div class="stat"><div class="sv2" style="color:var(--a2)">${rev.toFixed(0)}€</div><div class="sl">Facturación</div></div></div><div style="font-size:12px;color:var(--soft);margin-bottom:12px;line-height:1.8">${c.phone?`📞 ${c.phone}<br>`:''}${c.email?`📧 ${c.email}<br>`:''}${c.notes?`📝 ${c.notes}`:''}</div><div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Historial</div>${orders.length?orders.map(o=>{const s=STATUS_CFG[o.status]||{icon:'?'};return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);"><div><div style="font-size:12px;color:var(--text)">${o.pieceName} <span class="code-badge">${o.code||''}</span></div><div style="font-size:10px;color:var(--muted)">${fmtDate(o.date)} · ${o.qty} uds</div></div><div style="text-align:right"><div style="font-size:12px;color:var(--a2);font-weight:600">${fmt(o.totalOrder||0)}</div><span style="font-size:14px">${s.icon}</span></div></div>`;}).join(''):'<p class="hint">Sin pedidos.</p>'}`;$('cdm-edit').onclick=()=>{closeModal('clientDetailModal');openClientModal(id);};$('cdm-del').onclick=async()=>{if(!confirm('¿Eliminar cliente?'))return;if(window.dbOps)await window.dbOps.deleteClient(id);closeModal('clientDetailModal');toast('Cliente eliminado','red');};$('clientDetailModal').classList.add('open');}
+function showClientDetail(id){const c=window._data.clients.find(x=>x.id===id);if(!c)return;const orders=window._data.orders.filter(o=>o.client===c.name);const rev=orders.reduce((a,o)=>a+(o.totalOrder||0),0);const cost=orders.reduce((a,o)=>a+(o.costPerPiece||0)*(o.qty||1),0);const margin=rev-cost;const totalGrams=fmtR(orders.reduce((a,o)=>a+((o.filamentUsed?.gramsPerUnit||0)*(o.qty||1)),0));const totalH=fmtR(orders.reduce((a,o)=>a+(o.printMinutes||0)*(o.qty||1),0)/60);const lastOrder=orders.sort((a,b)=>b.date?.localeCompare(a.date||'')||0)[0];$('cdm-title').textContent=`👤 ${c.name} ${c.apellidos||''}`;$('cdm-body').innerHTML=`
+  <div style="margin-bottom:12px;"><span class="code-badge">${c.code||'Sin código'}</span>${c.status?` <span class="tag" style="margin-left:6px">${c.status}</span>`:''}</div>
+  <div class="g2" style="margin-bottom:8px">
+    <div class="stat"><div class="sv2" style="color:var(--a3)">${orders.length}</div><div class="sl">Pedidos</div></div>
+    <div class="stat"><div class="sv2" style="color:var(--a2)">${fmt(rev)}</div><div class="sl">Facturado</div></div>
+  </div>
+  <div class="g2" style="margin-bottom:12px">
+    <div class="stat"><div class="sv2" style="color:var(--accent)">${fmt(margin)}</div><div class="sl">Margen total</div></div>
+    <div class="stat"><div class="sv2" style="color:var(--muted);font-size:14px;">${lastOrder?fmtDate(lastOrder.date):'—'}</div><div class="sl">Último pedido</div></div>
+  </div>
+  <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+    <div style="background:var(--s2);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--muted);">🧵 <strong style="color:var(--text)">${totalGrams}g</strong> filamento total</div>
+    <div style="background:var(--s2);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--muted);">⏱ <strong style="color:var(--text)">${totalH}h</strong> impresión total</div>
+  </div>
+  <div style="font-size:12px;color:var(--soft);margin-bottom:12px;line-height:1.8">${c.phone?`📞 ${c.phone}<br>`:''}${c.email?`📧 ${c.email}<br>`:''}${c.notes?`📝 ${c.notes}`:''}</div>
+  <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Historial de pedidos</div>
+  ${orders.length?orders.map(o=>{const s=STATUS_CFG[o.status]||{icon:'?'};const m=(o.totalOrder||0)-(o.costPerPiece||0)*(o.qty||1);return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);"><div><div style="font-size:12px;color:var(--text)">${o.pieceName} <span class="code-badge">${o.code||''}</span></div><div style="font-size:10px;color:var(--muted)">${fmtDate(o.date)} · ${o.qty} uds${o.filamentUsed?.gramsPerUnit?` · 🧵${o.filamentUsed.gramsPerUnit}g/ud`:''}</div></div><div style="text-align:right"><div style="font-size:12px;color:var(--a2);font-weight:600">${fmt(o.totalOrder||0)}</div><div style="font-size:10px;color:${m>=0?'var(--accent)':'var(--red)'}">${m>=0?'+':''}${fmt(m)}</div></div></div>`;}).join(''):'<p class="hint">Sin pedidos.</p>'}`;$('cdm-edit').onclick=()=>{closeModal('clientDetailModal');openClientModal(id);};$('cdm-del').onclick=async()=>{if(!confirm('¿Eliminar cliente?'))return;if(window.dbOps)await window.dbOps.deleteClient(id);closeModal('clientDetailModal');toast('Cliente eliminado','red');};$('clientDetailModal').classList.add('open');}
 
 /* ════ MATERIALS ════ */
 let editingMatId=null;
@@ -1907,11 +2003,127 @@ function renderFinance(){
   $('f-revenue').textContent=revenue.toFixed(2)+' €';
   $('f-expenses').textContent=(expTotal+prodCostTotal).toFixed(2)+' €';
   $('f-profit').textContent=(revenue-expTotal-prodCostTotal).toFixed(2)+' €';
+  // Monthly chart (last 6 months)
+  const months=[];for(let i=5;i>=0;i--){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);months.push({key:d.toISOString().slice(0,7),label:d.toLocaleString('es',{month:'short',year:'2-digit'}).replace(' ','\'')}); }
+  const monthData=months.map(m=>({...m,rev:0,cost:0}));
+  orders.forEach(o=>{if(!o.date)return;const mk=o.date.slice(0,7);const md=monthData.find(m=>m.key===mk);if(md){md.rev+=(o.totalOrder||0);md.cost+=(o.costPerPiece||0)*(o.qty||1);}});
+  const maxVal=Math.max(...monthData.flatMap(m=>[m.rev,m.cost]),1);
+  const barW=100/months.length;
+  $('f-monthly-chart').innerHTML=`
+    <div style="display:flex;align-items:flex-end;gap:4px;height:120px;padding:0 4px;">
+      ${monthData.map(m=>{const revH=Math.max((m.rev/maxVal)*100,0);const costH=Math.max((m.cost/maxVal)*100,0);const profit=m.rev-m.cost;return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
+        <div style="width:100%;display:flex;align-items:flex-end;gap:2px;height:100px;">
+          <div style="flex:1;background:var(--accent);border-radius:3px 3px 0 0;height:${revH}%;opacity:.85;" title="Ingresos: ${fmt(m.rev)}"></div>
+          <div style="flex:1;background:var(--red);border-radius:3px 3px 0 0;height:${costH}%;opacity:.7;" title="Costes: ${fmt(m.cost)}"></div>
+        </div>
+        <div style="font-size:9px;color:var(--muted);text-align:center;">${m.label}</div>
+        <div style="font-size:9px;font-weight:600;color:${profit>=0?'var(--accent)':'var(--red)'};">${profit>=0?'+':''}${fmt(profit)}</div>
+      </div>`;}).join('')}
+    </div>
+    <div style="display:flex;gap:14px;margin-top:8px;justify-content:center;">
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><div style="width:10px;height:10px;background:var(--accent);border-radius:2px;opacity:.85;"></div>Ingresos</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><div style="width:10px;height:10px;background:var(--red);border-radius:2px;opacity:.7;"></div>Costes</div>
+    </div>`;
   $('productionCostsTable').innerHTML=productionOrders.length?`<div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Pieza</th><th>Estado</th><th>Uds</th><th>Coste</th></tr></thead><tbody>${productionOrders.map(o=>{const s=STATUS_CFG[o.status]||{icon:'?',label:o.status};return`<tr><td><span class="code-badge">${o.code||'—'}</span></td><td class="tdn">${o.pieceName}</td><td>${s.icon} ${s.label}</td><td>${o.qty}</td><td style="color:var(--red);font-weight:600">${fmt((o.costPerPiece||0)*(o.qty||1))}</td></tr>`;}).join('')}<tr><td colspan="4" style="color:var(--text);font-weight:700">Total</td><td style="color:var(--red);font-weight:700">${fmt(prodCostTotal)}</td></tr></tbody></table></div>`:`<p class="hint">Los costes aparecen cuando las piezas están en producción o posterior.</p>`;
-  $('expenseTable').innerHTML=expenses.length?`<div class="tbl-wrap"><table><thead><tr><th>Concepto</th><th>Categoría</th><th>Fecha</th><th>Importe</th><th></th></tr></thead><tbody>${expenses.map(e=>`<tr><td class="tdn">${e.name}</td><td><span class="tag">${e.category||'—'}</span></td><td>${fmtDate(e.date)}</td><td style="color:var(--red);font-weight:600">${fmt(e.amount||0)}</td><td><button class="btn btn-danger btn-sm btn-icon" onclick="deleteExpense('${e.id}')">🗑</button></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty"><div class="ei">💸</div><p>Sin gastos adicionales.</p></div>`;}
+  $('expenseTable').innerHTML=expenses.length?`<div class="tbl-wrap"><table><thead><tr><th>Concepto</th><th>Categoría</th><th>Fecha</th><th>Importe</th><th></th></tr></thead><tbody>${expenses.map(e=>`<tr><td class="tdn">${e.name}</td><td><span class="tag">${e.category||'—'}</span></td><td>${fmtDate(e.date)}</td><td style="color:var(--red);font-weight:600">${fmt(e.amount||0)}</td><td><button class="btn btn-danger btn-sm btn-icon" onclick="deleteExpense('${e.id}')">🗑</button></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty"><div class="ei">💸</div><p>Sin gastos adicionales.</p></div>`;
+}
+function generateMonthlyReport(){
+  const orders=window._data.orders,expenses=window._data.expenses,s=window._data.settings||{};
+  const now=new Date();const monthKey=now.toISOString().slice(0,7);
+  const monthName=now.toLocaleString('es',{month:'long',year:'numeric'});
+  const mo=orders.filter(o=>o.date&&o.date.startsWith(monthKey));
+  const me=expenses.filter(e=>e.date&&e.date.startsWith(monthKey));
+  const rev=mo.reduce((a,o)=>a+(o.totalOrder||0),0);
+  const cost=mo.reduce((a,o)=>a+(o.costPerPiece||0)*(o.qty||1),0);
+  const expT=me.reduce((a,e)=>a+(e.amount||0),0);
+  const profit=rev-cost-expT;
+  const printH=fmtR(mo.reduce((a,o)=>a+(o.printMinutes||0)*(o.qty||1),0)/60);
+  const totalGrams=fmtR(mo.reduce((a,o)=>a+((o.filamentUsed?.gramsPerUnit||0)*(o.qty||1)),0));
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe ${monthName}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1a1a2e;background:#fff;padding:48px;max-width:800px;margin:0 auto;}
+  h1{font-size:26px;font-weight:900;margin-bottom:4px;}h2{font-size:14px;font-weight:700;margin:24px 0 10px;letter-spacing:1px;text-transform:uppercase;color:#6b7280;border-bottom:2px solid #00e5a0;padding-bottom:4px;}
+  .hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:3px solid #00e5a0;}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+  .stat-box{background:#f8fafc;border-radius:8px;padding:14px;text-align:center;}
+  .stat-val{font-size:20px;font-weight:900;}.stat-lbl{font-size:11px;color:#6b7280;margin-top:3px;}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;}
+  th{background:#1a1a2e;color:#fff;padding:8px 12px;text-align:left;font-size:11px;letter-spacing:1px;}
+  td{padding:8px 12px;border-bottom:1px solid #f1f5f9;}.total-row td{font-weight:700;background:#f8fafc;}
+  .green{color:#00a673;}.red{color:#dc2626;}.footer{text-align:center;font-size:11px;color:#9ca3af;margin-top:32px;padding-top:16px;border-top:1px solid #f1f5f9;}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>
+  <div class="hdr"><div>${window._logoDataUrl?`<img src="${window._logoDataUrl}" style="max-height:50px;margin-bottom:6px;display:block;">`:''}
+  <h1>${s.company||'Fabridea'}</h1><div style="font-size:12px;color:#6b7280;margin-top:4px;">${s.nif||''} · ${s.address||''}</div></div>
+  <div style="text-align:right"><div style="font-size:20px;font-weight:900;">INFORME MENSUAL</div><div style="color:#6b7280;font-size:13px;margin-top:4px;">${monthName}</div></div></div>
+  <div class="stats">
+    <div class="stat-box"><div class="stat-val green">${fmt(rev)}</div><div class="stat-lbl">Ingresos</div></div>
+    <div class="stat-box"><div class="stat-val red">${fmt(cost+expT)}</div><div class="stat-lbl">Gastos totales</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:${profit>=0?'#00a673':'#dc2626'}">${fmt(profit)}</div><div class="stat-lbl">Beneficio</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:#7c6fff">${mo.length}</div><div class="stat-lbl">Pedidos</div></div>
+  </div>
+  <div class="stats" style="grid-template-columns:repeat(2,1fr)">
+    <div class="stat-box"><div class="stat-val" style="color:#f59e0b">${printH}h</div><div class="stat-lbl">Horas de impresión</div></div>
+    <div class="stat-box"><div class="stat-val" style="color:#60a5fa">${totalGrams}g</div><div class="stat-lbl">Filamento consumido</div></div>
+  </div>
+  <h2>Pedidos del mes</h2>
+  <table><thead><tr><th>Código</th><th>Pieza</th><th>Cliente</th><th>Uds</th><th>Coste</th><th>Total</th><th>Estado</th></tr></thead><tbody>
+  ${mo.map(o=>`<tr><td>${o.code||'—'}</td><td>${o.pieceName}</td><td>${o.client||''}</td><td>${o.qty||1}</td><td class="red">${fmt((o.costPerPiece||0)*(o.qty||1))}</td><td class="green">${fmt(o.totalOrder||0)}</td><td>${STATUS_CFG[o.status]?.icon||''} ${STATUS_CFG[o.status]?.label||o.status}</td></tr>`).join('')}
+  <tr class="total-row"><td colspan="4">TOTAL</td><td class="red">${fmt(cost)}</td><td class="green">${fmt(rev)}</td><td></td></tr></tbody></table>
+  ${me.length?`<h2>Gastos del mes</h2><table><thead><tr><th>Fecha</th><th>Concepto</th><th>Categoría</th><th>Importe</th></tr></thead><tbody>${me.map(e=>`<tr><td>${fmtDate(e.date)}</td><td>${e.name}</td><td>${e.category||'—'}</td><td class="red">${fmt(e.amount||0)}</td></tr>`).join('')}<tr class="total-row"><td colspan="3">TOTAL GASTOS</td><td class="red">${fmt(expT)}</td></tr></tbody></table>`:''}
+  <div class="footer">Generado el ${fmtDate(today())} · CRM Fi 3D · ${s.company||'Fabridea'}</div>
+  </body></html>`;
+  const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);
+}
 async function deleteExpense(id){if(!confirm('¿Eliminar?'))return;if(window.dbOps)await window.dbOps.deleteExpense(id);toast('Gasto eliminado','red');}
 
-/* ════ EXCEL ════ */
+/* ════ CATALOG ════ */
+let editingCatalogId=null;
+function setOrdersTab(tab,btn){
+  $('orders-tab-orders').style.display=tab==='orders'?'':'none';
+  $('orders-tab-catalog').style.display=tab==='catalog'?'':'none';
+  document.querySelectorAll('#page-orders .ph-actions .btn-ghost').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  if(tab==='catalog')renderCatalog();
+}
+function renderCatalog(){
+  const items=window._data.catalog||[];
+  if(!items.length){$('catalogGrid').innerHTML=`<div class="empty"><div class="ei">📚</div><p>Sin piezas en el catálogo.<br>Añade piezas que fabricas habitualmente para lanzar pedidos rápidos.</p></div>`;return;}
+  $('catalogGrid').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">${items.map(item=>`
+    <div class="card" style="padding:14px;">
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;">${item.name}</div>
+      ${item.material?`<div style="font-size:11px;color:var(--muted);margin-bottom:4px;">🧵 ${item.material}</div>`:''}
+      <div style="display:flex;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+        ${item.grams?`<span style="font-size:11px;background:var(--s2);padding:2px 7px;border-radius:4px;">⚖️ ${item.grams}g</span>`:''}
+        ${item.minutes?`<span style="font-size:11px;background:var(--s2);padding:2px 7px;border-radius:4px;">⏱ ${item.minutes}min</span>`:''}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:12px;"><span style="color:var(--muted)">Coste: </span><span style="color:var(--red);font-weight:600">${fmt(item.cost||0)}</span></div>
+        <div style="font-size:12px;"><span style="color:var(--muted)">Venta: </span><span style="color:var(--accent);font-weight:600">${fmt(item.price||0)}</span></div>
+      </div>
+      ${item.notes?`<div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">${item.notes}</div>`:''}
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-primary btn-sm" style="flex:1" onclick="launchFromCatalog('${item.id}')">▶ Lanzar pedido</button>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openCatalogModal('${item.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="deleteCatalogItem('${item.id}')">🗑</button>
+      </div>
+    </div>`).join('')}</div>`;
+}
+function openCatalogModal(id){
+  editingCatalogId=id||null;
+  if(id){const item=window._data.catalog.find(x=>x.id===id)||{};$('cat-modal-title').textContent='✏️ Editar pieza';$('cat-id').value=id;$('cat-name').value=item.name||'';$('cat-grams').value=item.grams||0;$('cat-minutes').value=item.minutes||0;$('cat-cost').value=item.cost||0;$('cat-price').value=item.price||0;$('cat-material').value=item.material||'';$('cat-notes').value=item.notes||'';}
+  else{$('cat-modal-title').textContent='📚 Nueva pieza del catálogo';['cat-id','cat-name','cat-material','cat-notes'].forEach(f=>$(f).value='');$('cat-grams').value=50;$('cat-minutes').value=60;$('cat-cost').value=0;$('cat-price').value=0;}
+  $('catalogModal').classList.add('open');
+}
+async function saveCatalogItem(){const name=$('cat-name').value.trim();if(!name){toast('Nombre obligatorio','red');return;}const obj={name,grams:parseFloat($('cat-grams').value)||0,minutes:parseFloat($('cat-minutes').value)||0,cost:parseFloat($('cat-cost').value)||0,price:parseFloat($('cat-price').value)||0,material:$('cat-material').value.trim(),notes:$('cat-notes').value.trim()};if(editingCatalogId&&window.dbOps)await window.dbOps.updateCatalogItem(editingCatalogId,obj);else if(window.dbOps)await window.dbOps.addCatalogItem(obj);closeModal('catalogModal');toast('✓ Pieza guardada en catálogo','green');}
+async function deleteCatalogItem(id){if(!confirm('¿Eliminar esta pieza del catálogo?'))return;if(window.dbOps)await window.dbOps.deleteCatalogItem(id);toast('Pieza eliminada','red');}
+function launchFromCatalog(id){
+  const item=window._data.catalog.find(x=>x.id===id);if(!item)return;
+  // Pre-fill calculator and open save modal
+  $('pieceName').value=item.name;
+  if($('filamentWeight'))$('filamentWeight').value=item.grams||50;
+  if($('printHours'))$('printHours').value=item.minutes||60;
+  setOrdersTab('orders',null);go('calc');
+  setTimeout(()=>toast(`✓ Calculadora lista con "${item.name}"`, 'green'),300);
+}
 function xls(sheets,filename){const wb=XLSX.utils.book_new();sheets.forEach(s=>{const ws=XLSX.utils.aoa_to_sheet(s.data);XLSX.utils.book_append_sheet(wb,ws,s.name);});XLSX.writeFile(wb,filename);}
 function exportCalcXL(){const C=window._C;if(!C){toast('Nada que exportar');return;}const pn=$('pieceName').value.trim()||'Pieza';const rows=[['CALCULADORA COSTES · CRM FI 3D · FABRIDEA','',''],['Pieza: '+pn,'','Fecha: '+fmtDate(today())],['','',''],['CONCEPTO','€','%'],['Filamento',fmtR(C.fc),fmtR(C.fc/C.total*100)],['Electricidad',fmtR(C.ec),fmtR(C.ec/C.total*100)],['Amortización',fmtR(C.dc),fmtR(C.dc/C.total*100)],['Mantenimiento',fmtR(C.mc),fmtR(C.mc/C.total*100)],['Mano de obra',fmtR(C.lc),fmtR(C.lc/C.total*100)],['Embalaje',fmtR(C.pk),fmtR(C.pk/C.total*100)],['Envío',fmtR(C.sh),fmtR(C.sh/C.total*100)]];if(C.cc>0)rows.push(['Costes adicionales',fmtR(C.cc),fmtR(C.cc/C.total*100)]);rows.push(['','',''],['COSTE TOTAL',fmtR(C.total),100],['','',''],['PRECIO Y CARGA FISCAL','',''],['Precio venta (sin impuestos)',fmtR(C.sp),''],['Con comisión ('+C.pf+'%)',fmtR(C.spf),''],['','',''],['IVA cobrado al cliente ('+C.ivaRate+'%)',fmtR(C.ivaAmount),'Cargo al cliente'],['Base imponible IRPF',fmtR(C.baseIRPF),''],['IRPF a pagar ('+C.irpfRate+'%)',fmtR(C.irpfAmount),'Tu pago a Hacienda'],['Autónomo/pieza',fmtR(C.autonomoPieza),''],['Gestoría/pieza',fmtR(C.gestoriaPieza),''],['Lo que realmente cobras',fmtR(C.realIncome),'']);xls([{name:'Costes',data:rows}],'Costes-'+pn.replace(/\s+/g,'-')+'.xlsx');toast('✓ Excel descargado','green');}
 function exportOrdersXL(){const orders=window._data.orders;if(!orders.length){toast('Sin pedidos');return;}xls([{name:'Pedidos',data:[['Código','Fecha','Pieza','Cliente','Apellidos','Teléfono','Email','Uds','Coste/u','Precio/u','Total','Estado','Presupuesto','Factura','Notas'],...orders.map(o=>[o.code||'',o.date||'',o.pieceName,o.client,o.apellidos||'',o.phone||'',o.email||'',o.qty,o.costPerPiece||0,o.pricePerPiece||0,o.totalOrder||0,STATUS_CFG[o.status]?.label||o.status,o.budgetNum||'',o.invoiceNum||'',o.notes||''])]}],'Pedidos-'+today()+'.xlsx');toast('✓ Excel pedidos','green');}
