@@ -38,12 +38,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 @media(min-width:900px){body{font-size:15px;}}
 
 /* TOPBAR */
-.topbar{height:58px;background:var(--topbar-bg);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:12px;flex-shrink:0;z-index:100;box-shadow:0 1px 4px var(--shadow);}
+.topbar{height:58px;background:var(--topbar-bg);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0;z-index:100;box-shadow:0 1px 4px var(--shadow);overflow:hidden;}
+@media(min-width:900px){.topbar{padding:0 18px;gap:12px;}}
 .topbar-brand{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;white-space:nowrap;letter-spacing:-.3px;}
 @media(min-width:900px){.topbar-brand{font-size:19px;}}
 .topbar-brand span{color:var(--accent);}
 .topbar-spacer{flex:1;}
-.sync-status{font-size:10px;display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:100px;border:1px solid var(--border);background:var(--s2);}
+.sync-status{font-size:10px;display:flex;align-items:center;gap:5px;padding:4px 8px;border-radius:100px;border:1px solid var(--border);background:var(--s2);}
 .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:background .3s;}
 .sync-dot.ok{background:var(--accent);}
 .sync-dot.syncing{background:var(--yellow);animation:pulse .8s infinite;}
@@ -54,6 +55,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 .theme-toggle{background:var(--s2);border:1px solid var(--border);border-radius:100px;padding:4px 10px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--muted);transition:all .2s;white-space:nowrap;}
 .theme-toggle:hover{border-color:var(--accent);color:var(--text);}
 .theme-icon{font-size:14px;}
+.theme-lbl,.sync-txt{display:none;}
+@media(min-width:600px){.theme-lbl,.sync-txt{display:inline;}}
 
 .menu-toggle{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
 @media(min-width:900px){.menu-toggle{display:none;}}
@@ -342,14 +345,14 @@ tr:hover td{background:var(--s2);}
   </button>
   <div class="topbar-brand">CRM Fi <span>3D</span></div>
   <div class="topbar-spacer"></div>
-  <button id="stockAlertBtn" onclick="go('materials')" title="Stock bajo" style="display:none;background:var(--red);border:none;border-radius:100px;padding:4px 10px;font-size:11px;color:#fff;cursor:pointer;font-weight:700;gap:4px;align-items:center;">⚠️ <span id="stockAlertCount">0</span> stock bajo</button>
+  <button id="stockAlertBtn" onclick="go('materials')" title="Stock bajo" style="display:none;background:var(--red);border:none;border-radius:100px;padding:4px 9px;font-size:11px;color:#fff;cursor:pointer;font-weight:700;gap:4px;align-items:center;flex-shrink:0;white-space:nowrap;">⚠️ <span id="stockAlertCount">0</span></button>
   <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">
     <span class="theme-icon" id="themeIcon">🌙</span>
-    <span id="themeLabel">Oscuro</span>
+    <span class="theme-lbl" id="themeLabel">Oscuro</span>
   </button>
   <div class="sync-status" id="syncStatus">
     <div class="sync-dot" id="syncDot"></div>
-    <span id="syncTxt">Conectando…</span>
+    <span class="sync-txt" id="syncTxt">Conectando…</span>
   </div>
 </div>
 
@@ -2051,7 +2054,8 @@ function openMaterialModal(id){editingMatId=id||null;renderMatFields();if(id){co
 async function saveMaterial(){const name=$('mm-name').value.trim();if(!name){toast('Nombre obligatorio','red');return;}
   let type=$('mm-type')?.value||'';
   if(type==='Otro'){const custom=$('mm-type-other')?.value.trim();if(!custom){toast('Especifica el tipo de filamento','red');return;}type=custom;}
-  const obj={name,cat:$('mm-cat').value,type,color:$('mm-color')?.value||'',price:parseFloat($('mm-price')?.value)||0,spool:parseFloat($('mm-spool')?.value)||0,model:$('mm-model')?.value||'',watts:parseFloat($('mm-watts')?.value)||0,life:parseFloat($('mm-life')?.value)||0,stock:parseFloat($('mm-stock').value)||0,minStock:parseFloat($('mm-min').value)||1,supplier:$('mm-supplier').value.trim()};if(editingMatId&&window.dbOps)await window.dbOps.updateMaterial(editingMatId,obj);else if(window.dbOps)await window.dbOps.addMaterial(obj);closeModal('materialModal');toast('✓ Material guardado','green');}
+  const minVal=$('mm-min').value;const minStock=minVal===''?1:parseFloat(minVal);
+  const obj={name,cat:$('mm-cat').value,type,color:$('mm-color')?.value||'',price:parseFloat($('mm-price')?.value)||0,spool:parseFloat($('mm-spool')?.value)||0,model:$('mm-model')?.value||'',watts:parseFloat($('mm-watts')?.value)||0,life:parseFloat($('mm-life')?.value)||0,stock:parseFloat($('mm-stock').value)||0,minStock,supplier:$('mm-supplier').value.trim()};if(editingMatId&&window.dbOps)await window.dbOps.updateMaterial(editingMatId,obj);else if(window.dbOps)await window.dbOps.addMaterial(obj);closeModal('materialModal');toast('✓ Material guardado','green');}
 let matFilter='all';
 function setMF(f,btn){matFilter=f;document.querySelectorAll('#page-materials .pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderMaterials();}
 function renderMaterials(){let mats=window._data.materials||[];
