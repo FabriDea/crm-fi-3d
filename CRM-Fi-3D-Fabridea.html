@@ -167,6 +167,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .btn-excel{background:linear-gradient(135deg,#1d6f42,#2e9e5e);color:#fff;}
 .btn-orange{background:linear-gradient(135deg,#ea6c00,#ff6b35);color:#fff;}
 .btn-blue{background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;}
+.btn-accent{background:var(--accent);color:#0d0f14;border:none;font-weight:600;}
+.btn-accent:hover{opacity:.85;}
 .btn-ghost{background:var(--s2);color:var(--soft);border:1px solid var(--border);}
 .btn-ghost:hover{color:var(--text);border-color:var(--soft);}
 .btn-danger{background:rgba(255,68,68,.1);color:var(--red);border:1px solid rgba(255,68,68,.2);}
@@ -609,7 +611,10 @@ tr:hover td{background:var(--s2);}
   <!-- Catalog tab -->
   <div id="orders-tab-catalog" style="display:none">
     <div class="ph" style="margin-bottom:14px;">
-      <div><div style="font-size:13px;color:var(--muted)">Piezas guardadas para reutilizar. Pulsa ▶ para lanzar un pedido rápido.</div></div>
+      <div>
+        <button class="btn btn-ghost btn-sm" onclick="setOrdersTab('orders',null)" style="margin-bottom:6px;">← Volver a pedidos</button>
+        <div style="font-size:13px;color:var(--muted)">Piezas guardadas para reutilizar. Pulsa ▶ para lanzar un pedido rápido.</div>
+      </div>
       <button class="btn btn-primary btn-sm" onclick="openCatalogModal()">＋ Nueva pieza</button>
     </div>
     <div id="catalogGrid"></div>
@@ -663,14 +668,56 @@ tr:hover td{background:var(--s2);}
       <button class="btn btn-blue btn-sm" onclick="generateMonthlyReport()">📄 Informe mensual</button>
     </div>
   </div>
-  <div class="g3" style="margin-bottom:12px;">
-    <div class="stat"><div class="sv2" id="f-revenue" style="color:var(--accent)">0 €</div><div class="sl">Ingresos</div></div>
-    <div class="stat"><div class="sv2" id="f-expenses" style="color:var(--red)">0 €</div><div class="sl">Gastos totales</div></div>
-    <div class="stat"><div class="sv2" id="f-profit" style="color:var(--yellow)">0 €</div><div class="sl">Beneficio neto</div></div>
+  <!-- Finance tabs -->
+  <div class="pill-row" style="margin-bottom:14px;">
+    <button class="pill active" id="ftab-resumen" onclick="setFinanceTab('resumen',this)">📊 Resumen</button>
+    <button class="pill" id="ftab-budgets" onclick="setFinanceTab('budgets',this)">📄 Presupuestos</button>
+    <button class="pill" id="ftab-invoices" onclick="setFinanceTab('invoices',this)">🧾 Facturas</button>
   </div>
-  <div class="card" style="margin-bottom:12px;"><div class="ct"><span class="dot"></span>📈 Evolución mensual (últimos 6 meses)</div><div id="f-monthly-chart" style="padding:8px 0;"></div></div>
-  <div class="card" style="margin-bottom:12px;"><div class="ct"><span class="dot"></span>Costes producción (piezas en proceso)</div><div id="productionCostsTable"></div></div>
-  <div class="card"><div class="ct"><span class="dot"></span>Gastos adicionales</div><div id="expenseTable"></div></div>
+
+  <!-- Resumen tab -->
+  <div id="finance-tab-resumen">
+    <div class="g3" style="margin-bottom:12px;">
+      <div class="stat"><div class="sv2" id="f-revenue" style="color:var(--accent)">0 €</div><div class="sl">Ingresos</div></div>
+      <div class="stat"><div class="sv2" id="f-expenses" style="color:var(--red)">0 €</div><div class="sl">Gastos totales</div></div>
+      <div class="stat"><div class="sv2" id="f-profit" style="color:var(--yellow)">0 €</div><div class="sl">Beneficio neto</div></div>
+    </div>
+    <div class="card" style="margin-bottom:12px;"><div class="ct"><span class="dot"></span>📈 Evolución mensual (últimos 6 meses)</div><div id="f-monthly-chart" style="padding:8px 0;"></div></div>
+    <div class="card" style="margin-bottom:12px;"><div class="ct"><span class="dot"></span>Costes producción (piezas en proceso)</div><div id="productionCostsTable"></div></div>
+    <div class="card"><div class="ct"><span class="dot"></span>Gastos adicionales</div><div id="expenseTable"></div></div>
+  </div>
+
+  <!-- Presupuestos tab -->
+  <div id="finance-tab-budgets" style="display:none">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+      <select id="budget-filter-year" onchange="renderDocsTab('budget')" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:7px 10px;cursor:pointer;font-family:inherit;"></select>
+      <select id="budget-filter-month" onchange="renderDocsTab('budget')" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:7px 10px;cursor:pointer;font-family:inherit;">
+        <option value="all">Todos los meses</option>
+        <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
+        <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
+        <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+        <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+      </select>
+      <button class="btn btn-orange btn-sm" onclick="downloadSelectedDocs('budget')">📥 Descargar selección</button>
+    </div>
+    <div id="budgets-table"></div>
+  </div>
+
+  <!-- Facturas tab -->
+  <div id="finance-tab-invoices" style="display:none">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+      <select id="invoice-filter-year" onchange="renderDocsTab('invoice')" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:7px 10px;cursor:pointer;font-family:inherit;"></select>
+      <select id="invoice-filter-month" onchange="renderDocsTab('invoice')" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:7px 10px;cursor:pointer;font-family:inherit;">
+        <option value="all">Todos los meses</option>
+        <option value="01">Enero</option><option value="02">Febrero</option><option value="03">Marzo</option>
+        <option value="04">Abril</option><option value="05">Mayo</option><option value="06">Junio</option>
+        <option value="07">Julio</option><option value="08">Agosto</option><option value="09">Septiembre</option>
+        <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+      </select>
+      <button class="btn btn-blue btn-sm" onclick="downloadSelectedDocs('invoice')">📥 Descargar selección</button>
+    </div>
+    <div id="invoices-table"></div>
+  </div>
 </div>
 
 <!-- AJUSTES -->
@@ -785,6 +832,31 @@ tr:hover td{background:var(--s2);}
       ℹ️ El IVA aparece en los documentos del cliente (presupuesto/factura).<br>
       El IRPF es una obligación interna y <strong>no aparece en los documentos del cliente</strong>, solo en el cálculo de rentabilidad.
     </div>
+  </div>
+
+  <!-- BLOQUE 5: MANTENIMIENTO IMPRESORA -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="ct"><span class="dot"></span>🔧 Mantenimiento de impresora</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Configura las tareas de mantenimiento. El CRM te avisará en el Dashboard cuando toque según las horas acumuladas de impresión.</div>
+
+    <div class="fr" style="margin-bottom:12px;align-items:flex-end;">
+      <div class="field" style="margin-bottom:0">
+        <label>Cargar perfil predefinido</label>
+        <select id="set-printer-preset" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 10px;width:100%;">
+          <option value="">— Selecciona impresora —</option>
+          <option value="bambu-p2s">Bambu Lab P2S</option>
+          <option value="bambu-x1c">Bambu Lab X1C</option>
+          <option value="bambu-a1">Bambu Lab A1</option>
+          <option value="prusa-mk4">Prusa MK4</option>
+          <option value="creality-k1">Creality K1</option>
+          <option value="custom">Personalizada (manual)</option>
+        </select>
+      </div>
+      <button class="btn btn-ghost btn-sm" style="white-space:nowrap;flex-shrink:0" onclick="loadPrinterPreset()">↓ Cargar</button>
+    </div>
+
+    <div id="maintenance-tasks-list" style="margin-bottom:12px;"></div>
+    <button class="btn btn-ghost btn-sm" onclick="addMaintenanceTask()">＋ Añadir tarea personalizada</button>
   </div>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -1159,6 +1231,7 @@ function initListeners(){
       Object.entries(taxFields).forEach(([k,id])=>{if(d[k]!==undefined&&document.getElementById(id))document.getElementById(id).value=d[k];});
       if(d.calcSettings)Object.assign(window._calcSettings,d.calcSettings);
       if(d.theme){document.documentElement.setAttribute('data-theme',d.theme);updateThemeBtn(d.theme);}
+      if(d.maintenanceTasks){maintenanceTasks=d.maintenanceTasks;renderMaintenanceTasks();}
       applyCalcSettings();applySettingsToCalc();calc();
     }
   });
@@ -1270,7 +1343,7 @@ function go(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove(
 function toggleSidebar(){$('sidebar').classList.toggle('open');$('overlay').classList.toggle('open');}
 function closeSidebar(){$('sidebar').classList.remove('open');$('overlay').classList.remove('open');}
 function closeModal(id){$(id).classList.remove('open');}
-function updateBadges(){const d=window._data;$('nb-orders').textContent=d.orders.length;$('nb-clients').textContent=d.clients.length;$('nb-materials').textContent=d.materials.length;const lowCount=(d.materials||[]).filter(m=>m.stock<=m.minStock).length;const btn=$('stockAlertBtn');if(btn){btn.style.display=lowCount>0?'flex':'none';$('stockAlertCount').textContent=lowCount;}}
+function updateBadges(){const d=window._data;$('nb-orders').textContent=d.orders.length;$('nb-clients').textContent=d.clients.length;$('nb-materials').textContent=d.materials.length;const lowCount=(d.materials||[]).filter(m=>m.minStock>0&&m.stock<=m.minStock).length;const btn=$('stockAlertBtn');if(btn){btn.style.display=lowCount>0?'flex':'none';$('stockAlertCount').textContent=lowCount;}}
 
 /* ════ LOGO ════ */
 function handleLogoUpload(input){
@@ -1334,6 +1407,7 @@ async function saveSettings(){
     defSpoolWeight:parseFloat($('set-spoolWeight').value)||1000,
     defPackCost:parseFloat($('set-packCost').value)||1.5,
     defShipCost:parseFloat($('set-shipCost').value)||4,
+    maintenanceTasks:maintenanceTasks,
   };
   Object.assign(window._data.settings,data);
   if(window.dbOps)await window.dbOps.saveSettings(data);
@@ -1377,11 +1451,11 @@ function renderDashboard(){
   const show=Object.keys(STATUS_CFG).filter(k=>sc[k]>0);
   $('d-status-bars').innerHTML=show.length?show.map(k=>{const c=STATUS_CFG[k];return`<div class="cbh"><span class="cbhl">${c.icon} ${c.label}</span><div class="cbht"><div class="cbhf" style="width:${(sc[k]/tot*100).toFixed(0)}%;background:${c.color}"></div></div><span class="cbhv">${sc[k]}</span></div>`;}).join(''):'<p class="hint">Sin pedidos aún.</p>';
   $('d-recent').innerHTML=orders.slice(0,5).map(o=>{const s=STATUS_CFG[o.status]||{icon:'?'};return`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);"><div><div style="font-size:12px;color:var(--text)">${o.pieceName}</div><div style="font-size:10px;color:var(--muted)">${o.client||''} · ${fmtDate(o.date)}</div></div><span style="font-size:16px">${s.icon}</span></div>`;}).join('')||'<p class="hint">Sin pedidos.</p>';
-  const low=materials.filter(m=>m.stock<=m.minStock);
+  const low=materials.filter(m=>m.minStock>0&&m.stock<=m.minStock);
   $('d-lowstock').innerHTML=low.length?low.map(m=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;color:var(--text)">${m.name}</span><span class="badge b-low">${m.stock} ${m.cat==='filamento'?'g':'uds'}</span></div>`).join(''):`<p class="hint" style="color:var(--accent)">✓ Todo el stock está bien.</p>`;
   const filaments=materials.filter(m=>m.cat==='filamento').sort((a,b)=>(a.stock||0)-(b.stock||0));
   const filTop=filaments.slice(0,4);
-  $('d-filstock').innerHTML=filTop.length?filTop.map(m=>{const label=`${m.type||'?'}${m.color?' · '+m.color:''}`;const low=m.stock<=m.minStock;return`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;color:var(--text)">${label}</span><span class="badge ${low?'b-low':'b-ok'}">${m.stock||0} g</span></div>`;}).join('')+(filaments.length>4?`<button class="btn btn-ghost btn-sm btn-full" style="margin-top:8px" onclick="go('materials')">Ver todos (${filaments.length}) →</button>`:''):'<p class="hint">Sin filamentos en inventario.</p>';
+  $('d-filstock').innerHTML=filTop.length?filTop.map(m=>{const label=`${m.type||'?'}${m.color?' · '+m.color:''}`;const isLow=m.minStock>0&&m.stock<=m.minStock;return`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;color:var(--text)">${label}</span><span class="badge ${isLow?'b-low':'b-ok'}">${m.stock||0} g</span></div>`;}).join('')+(filaments.length>4?`<button class="btn btn-ghost btn-sm btn-full" style="margin-top:8px" onclick="go('materials')">Ver todos (${filaments.length}) →</button>`:''):'<p class="hint">Sin filamentos en inventario.</p>';
   $('d-finsummary').innerHTML=`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Ingresos</span><span style="color:var(--accent)">${fmt(revenue)}</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Costes prod.</span><span style="color:var(--red)">${fmt(cost)}</span></div><div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--soft)">Gastos</span><span style="color:var(--red)">${fmt(expTotal)}</span></div><div style="display:flex;justify-content:space-between;padding:9px 0 3px;font-size:13px;font-weight:600;"><span>Beneficio</span><span style="color:var(--yellow)">${fmt(revenue-cost-expTotal)}</span></div>`;
   // Printer hours & maintenance alerts
   const totalPrintMin=orders.reduce((a,o)=>a+(o.printMinutes||0)*(o.qty||1),0);
@@ -1389,11 +1463,9 @@ function renderDashboard(){
   const printerLife=s.defPrinterLife||5000;
   const pct=Math.min((totalPrintH/printerLife)*100,100);
   const alertColor=pct>80?'var(--red)':pct>60?'var(--yellow)':'var(--accent)';
-  const maintAlerts=[];
-  if(totalPrintH>50&&totalPrintH%200<5)maintAlerts.push('Revisar lubricación de ejes');
-  if(totalPrintH>100&&totalPrintH%500<5)maintAlerts.push('Inspeccionar hotend y boquilla');
-  if(totalPrintH>200&&totalPrintH%1000<5)maintAlerts.push('Revisar correas y extrusor');
-  if(pct>80)maintAlerts.push('⚠️ Impresora cerca del fin de vida útil estimada');
+  const alerts=getMaintenanceAlerts();
+  const dueAlerts=alerts.filter(a=>a.isDue);
+  const soonAlerts=alerts.filter(a=>!a.isDue);
   $('d-printer-hours').innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
       <span style="font-size:22px;font-weight:800;color:${alertColor}">${totalPrintH}h</span>
@@ -1402,9 +1474,10 @@ function renderDashboard(){
     <div style="background:var(--border);border-radius:100px;height:6px;overflow:hidden;margin-bottom:10px;">
       <div style="height:100%;width:${pct.toFixed(1)}%;background:${alertColor};border-radius:100px;transition:width .5s;"></div>
     </div>
-    ${maintAlerts.length?maintAlerts.map(a=>`<div style="font-size:11px;color:var(--yellow);padding:3px 0;">⚠️ ${a}</div>`).join(''):
-    `<p class="hint" style="color:var(--accent)">✓ Sin alertas de mantenimiento.</p>`}
-    <div style="font-size:10px;color:var(--muted);margin-top:6px;">Total piezas registradas: ${orders.length} · ${orders.filter(o=>o.printMinutes).length} con tiempo de impresión</div>`;
+    ${dueAlerts.length?`<div style="font-size:11px;font-weight:700;color:var(--red);margin-bottom:4px;">⚠️ MANTENIMIENTO PENDIENTE:</div>`+dueAlerts.map(a=>`<div style="font-size:11px;color:var(--red);padding:3px 0;display:flex;justify-content:space-between;"><span>• ${a.name}</span>${a.url?`<a href="${a.url}" target="_blank" style="color:var(--blue);font-size:10px;">Manual →</a>`:''}</div>`).join(''):''}
+    ${soonAlerts.length?`<div style="font-size:11px;font-weight:700;color:var(--yellow);margin-bottom:4px;margin-top:6px;">🔔 Próximamente:</div>`+soonAlerts.map(a=>`<div style="font-size:11px;color:var(--yellow);padding:2px 0;">• ${a.name} — en ${a.remaining.toFixed(0)}h</div>`).join(''):''}
+    ${!dueAlerts.length&&!soonAlerts.length?`<p class="hint" style="color:var(--accent)">✓ Sin alertas de mantenimiento.</p>`:''}
+    <button class="btn btn-ghost btn-sm btn-full" style="margin-top:8px" onclick="go('settings')">⚙️ Gestionar mantenimiento</button>`;
   // Esta semana
   const now=new Date();const weekAgo=new Date(now-7*864e5);
   const weekOrders=orders.filter(o=>o.date&&new Date(o.date)>=weekAgo);
@@ -1988,7 +2061,7 @@ function renderMaterials(){let mats=window._data.materials||[];
   if(sortMode==='stock-asc')mats.sort((a,b)=>(a.stock||0)-(b.stock||0));
   else if(sortMode==='stock-desc')mats.sort((a,b)=>(b.stock||0)-(a.stock||0));
   else if(sortMode==='name')mats.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  if(!mats.length){$('materialTable').innerHTML=`<div class="empty"><div class="ei">🧵</div><p>${matFilter==='all'?'Sin materiales.<br>Añade filamentos, impresoras y consumibles.':'Sin materiales con este filtro.'}</p></div>`;return;}const catIcon={filamento:'🧵',impresora:'🖨',consumible:'🔧',quimico:'🧪',otro:'📦'};$('materialTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Cat.</th><th>Material</th><th>Detalle</th><th>Precio</th><th>Stock</th><th>Mín.</th><th>Proveedor</th><th></th></tr></thead><tbody>${mats.map(m=>{const unit=m.cat==='filamento'?'g':'uds';return`<tr><td><span class="tag">${catIcon[m.cat]||'📦'} ${m.cat||'otro'}</span></td><td class="tdn">${m.name}</td><td style="font-size:11px;color:var(--muted)">${m.type||m.model||'—'}${m.color?' · '+m.color:''}</td><td>${m.price?fmt(m.price):'—'}</td><td><span class="badge ${m.stock<=m.minStock?'b-low':'b-ok'}">${m.stock} ${unit}</span></td><td style="color:var(--muted)">${m.minStock} ${unit}</td><td style="font-size:11px;color:var(--muted)">${m.supplier||'—'}</td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="openMaterialModal('${m.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteMaterial('${m.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;}
+  if(!mats.length){$('materialTable').innerHTML=`<div class="empty"><div class="ei">🧵</div><p>${matFilter==='all'?'Sin materiales.<br>Añade filamentos, impresoras y consumibles.':'Sin materiales con este filtro.'}</p></div>`;return;}const catIcon={filamento:'🧵',impresora:'🖨',consumible:'🔧',quimico:'🧪',otro:'📦'};$('materialTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Cat.</th><th>Material</th><th>Detalle</th><th>Precio</th><th>Stock</th><th>Mín.</th><th>Proveedor</th><th></th></tr></thead><tbody>${mats.map(m=>{const unit=m.cat==='filamento'?'g':'uds';const isLow=m.minStock>0&&m.stock<=m.minStock;return`<tr><td><span class="tag">${catIcon[m.cat]||'📦'} ${m.cat||'otro'}</span></td><td class="tdn">${m.name}</td><td style="font-size:11px;color:var(--muted)">${m.type||m.model||'—'}${m.color?' · '+m.color:''}</td><td>${m.price?fmt(m.price):'—'}</td><td><span class="badge ${isLow?'b-low':'b-ok'}">${m.stock} ${unit}</span></td><td style="color:var(--muted)">${m.minStock} ${unit}</td><td style="font-size:11px;color:var(--muted)">${m.supplier||'—'}</td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="openMaterialModal('${m.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteMaterial('${m.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;}
 async function deleteMaterial(id){if(!confirm('¿Eliminar?'))return;if(window.dbOps)await window.dbOps.deleteMaterial(id);toast('Material eliminado','red');}
 
 /* ════ FINANCE ════ */
@@ -2075,13 +2148,184 @@ function generateMonthlyReport(){
 }
 async function deleteExpense(id){if(!confirm('¿Eliminar?'))return;if(window.dbOps)await window.dbOps.deleteExpense(id);toast('Gasto eliminado','red');}
 
+/* ════ MAINTENANCE SYSTEM ════ */
+const PRINTER_PRESETS={
+  'bambu-p2s':{
+    name:'Bambu Lab P2S',
+    manualUrl:'https://wiki.bambulab.com/es/p2s/maintenance/period-maintenance',
+    tasks:[
+      {id:'xy-lube',name:'Lubricación ejes XY',hours:150,description:'Limpiar y lubricar ejes X e Y con aceite Bambu Lab. Mover cabezal 3-5 veces tras aplicar.',url:'https://wiki.bambulab.com/es/p2s/maintenance/period-maintenance'},
+      {id:'z-lube',name:'Mantenimiento eje Z',hours:300,description:'Lubricar husillo Z y rodamientos inferiores. Mover placa arriba/abajo 3-5 veces.',url:'https://wiki.bambulab.com/es/p2s/maintenance/period-maintenance'},
+      {id:'idler-lube',name:'Lubricación poleas tensoras XY',hours:300,description:'Lubricar ejes de las poleas tensoras frontales y traseras.',url:'https://wiki.bambulab.com/en/p2s/maintenance/idler-pulley-lubrication'},
+      {id:'hotend-clean',name:'Limpieza hotend y boquilla',hours:200,description:'Calentar boquilla a 250°C y limpiar. Limpiar bloque calefactor. Usar guantes resistentes al calor.',url:'https://wiki.bambulab.com/es/p2s/maintenance/period-maintenance'},
+      {id:'fans-clean',name:'Limpieza ventiladores',hours:400,description:'Limpiar ventilador de pieza y ventilador del fusor. Retirar polvo acumulado.',url:'https://wiki.bambulab.com/es/p2s/maintenance/period-maintenance'},
+      {id:'cutter-check',name:'Revisión cortador filamento',hours:250,description:'Revisar cuchillas del cortador (equivale a ~10 bobinas). Reemplazar si están desafiladas.',url:'https://wiki.bambulab.com/es/p2s/maintenance/period-maintenance'},
+      {id:'calibration',name:'Calibración completa',hours:200,description:'Ejecutar calibración completa desde pantalla tras cualquier mantenimiento mecánico.',url:'https://wiki.bambulab.com/es/p2s/maintenance/period-maintenance'},
+    ]
+  },
+  'bambu-x1c':{name:'Bambu Lab X1C',manualUrl:'https://wiki.bambulab.com/en/x1/maintenance',tasks:[
+    {id:'xy-lube',name:'Lubricación ejes XY',hours:150,description:'Limpiar y lubricar guías lineales X e Y.',url:'https://wiki.bambulab.com/en/x1/maintenance'},
+    {id:'z-lube',name:'Mantenimiento eje Z',hours:300,description:'Lubricar husillo Z y rodamientos.',url:'https://wiki.bambulab.com/en/x1/maintenance'},
+    {id:'hotend-clean',name:'Limpieza hotend',hours:200,description:'Limpieza de boquilla y bloque calefactor a 250°C.',url:'https://wiki.bambulab.com/en/x1/maintenance'},
+    {id:'calibration',name:'Calibración completa',hours:200,description:'Calibración completa tras mantenimiento mecánico.',url:'https://wiki.bambulab.com/en/x1/maintenance'},
+  ]},
+  'bambu-a1':{name:'Bambu Lab A1',manualUrl:'https://wiki.bambulab.com/en/a1/maintenance',tasks:[
+    {id:'xy-lube',name:'Lubricación ejes XY',hours:150,description:'Lubricar guías lineales X e Y.',url:'https://wiki.bambulab.com/en/a1/maintenance'},
+    {id:'z-lube',name:'Mantenimiento eje Z',hours:300,description:'Lubricar husillo Z.',url:'https://wiki.bambulab.com/en/a1/maintenance'},
+    {id:'hotend-clean',name:'Limpieza hotend',hours:200,description:'Limpieza de boquilla a 250°C.',url:'https://wiki.bambulab.com/en/a1/maintenance'},
+  ]},
+  'prusa-mk4':{name:'Prusa MK4',manualUrl:'https://help.prusa3d.com/es/guide/mantenimiento-regular_1790',tasks:[
+    {id:'pinda-clean',name:'Limpieza sonda y cama',hours:100,description:'Limpiar superficie cama y sonda PINDA.',url:'https://help.prusa3d.com/es/guide/mantenimiento-regular_1790'},
+    {id:'rods-lube',name:'Lubricación varillas',hours:200,description:'Lubricar varillas lisas X, Y y Z con grasa Prusa.',url:'https://help.prusa3d.com/es/guide/mantenimiento-regular_1790'},
+    {id:'hotend-clean',name:'Limpieza hotend',hours:200,description:'Limpieza de boquilla E3D y bloque calefactor.',url:'https://help.prusa3d.com/es/guide/mantenimiento-regular_1790'},
+  ]},
+  'creality-k1':{name:'Creality K1',manualUrl:'https://www.creality.com/pages/download-k1',tasks:[
+    {id:'xy-lube',name:'Lubricación ejes XY',hours:200,description:'Lubricar guías lineales X e Y.',url:'https://www.creality.com/pages/download-k1'},
+    {id:'hotend-clean',name:'Limpieza hotend',hours:150,description:'Limpieza de boquilla y zona calefactora.',url:'https://www.creality.com/pages/download-k1'},
+  ]},
+};
+
+let maintenanceTasks=[];
+
+function loadPrinterPreset(){
+  const preset=$('set-printer-preset').value;
+  if(!preset){toast('Selecciona una impresora primero','red');return;}
+  if(preset==='custom'){maintenanceTasks=[{id:'task-'+Date.now(),name:'',hours:100,description:'',url:'',doneAt:0}];renderMaintenanceTasks();return;}
+  const p=PRINTER_PRESETS[preset];
+  if(!p)return;
+  maintenanceTasks=p.tasks.map(t=>({...t,doneAt:0}));
+  renderMaintenanceTasks();
+  toast(`✓ Perfil ${p.name} cargado`,'green');
+}
+function renderMaintenanceTasks(){
+  const el=$('maintenance-tasks-list');if(!el)return;
+  if(!maintenanceTasks.length){el.innerHTML='<p class="hint">Sin tareas. Carga un perfil o añade tareas manualmente.</p>';return;}
+  const totalH=fmtR(window._data.orders.reduce((a,o)=>a+(o.printMinutes||0)*(o.qty||1),0)/60);
+  el.innerHTML=maintenanceTasks.map((t,i)=>{
+    const nextDue=t.doneAt+t.hours;
+    const remaining=nextDue-totalH;
+    const isDue=remaining<=0;
+    const isSoon=remaining>0&&remaining<=20;
+    const statusColor=isDue?'var(--red)':isSoon?'var(--yellow)':'var(--accent)';
+    const statusText=isDue?`⚠️ Vencida (hace ${Math.abs(remaining).toFixed(0)}h)`:`Próxima en ${remaining.toFixed(0)}h (a las ${nextDue.toFixed(0)}h)`;
+    return`<div style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;">
+          <input type="text" value="${t.name}" placeholder="Nombre de la tarea" onchange="maintenanceTasks[${i}].name=this.value"
+            style="background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;width:100%;padding:2px 0;margin-bottom:4px;">
+          <input type="text" value="${t.description||''}" placeholder="Descripción (opcional)" onchange="maintenanceTasks[${i}].description=this.value"
+            style="background:transparent;border:none;border-bottom:1px dashed var(--border);color:var(--soft);font-size:11px;width:100%;padding:2px 0;">
+        </div>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="removeMaintenanceTask(${i})" title="Eliminar">🗑</button>
+      </div>
+      <div class="fr" style="margin-top:8px;align-items:center;">
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:10px">Cada (horas)</label>
+          <div class="iw"><input type="number" value="${t.hours}" min="1" step="1" class="hu" onchange="maintenanceTasks[${i}].hours=parseFloat(this.value)||100;renderMaintenanceTasks()"><span class="unit">h</span></div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label style="font-size:10px">Realizado en (h acum.)</label>
+          <div class="iw"><input type="number" value="${t.doneAt||0}" min="0" step="1" class="hu" onchange="maintenanceTasks[${i}].doneAt=parseFloat(this.value)||0;renderMaintenanceTasks()"><span class="unit">h</span></div>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+        <span style="font-size:11px;color:${statusColor}">${statusText}</span>
+        <div style="display:flex;gap:6px;">
+          ${t.url?`<a href="${t.url}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:11px;">📖 Manual</a>`:''}
+          <button class="btn btn-accent btn-sm" style="font-size:11px;" onclick="markMaintenanceDone(${i})">✓ Realizado</button>
+        </div>
+      </div>
+      <div style="margin-top:6px;">
+        <input type="text" value="${t.url||''}" placeholder="URL manual (opcional, pega el enlace aquí)" onchange="maintenanceTasks[${i}].url=this.value;renderMaintenanceTasks()"
+          style="background:var(--input-bg);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:10px;width:100%;padding:4px 8px;">
+      </div>
+    </div>`;
+  }).join('');
+}
+function addMaintenanceTask(){
+  maintenanceTasks.push({id:'task-'+Date.now(),name:'Nueva tarea',hours:100,description:'',url:'',doneAt:0});
+  renderMaintenanceTasks();
+}
+function removeMaintenanceTask(i){maintenanceTasks.splice(i,1);renderMaintenanceTasks();}
+function markMaintenanceDone(i){
+  const totalH=fmtR(window._data.orders.reduce((a,o)=>a+(o.printMinutes||0)*(o.qty||1),0)/60);
+  maintenanceTasks[i].doneAt=totalH;
+  renderMaintenanceTasks();
+  toast(`✓ Mantenimiento registrado a las ${totalH}h`,'green');
+}
+function loadMaintenanceFromSettings(){
+  const tasks=window._data.settings?.maintenanceTasks;
+  if(tasks&&tasks.length){maintenanceTasks=tasks;renderMaintenanceTasks();}
+  else{maintenanceTasks=[];renderMaintenanceTasks();}
+}
+function getMaintenanceAlerts(){
+  const totalH=fmtR(window._data.orders.reduce((a,o)=>a+(o.printMinutes||0)*(o.qty||1),0)/60);
+  return maintenanceTasks.filter(t=>{const nextDue=t.doneAt+t.hours;return totalH>=(nextDue-20);}).map(t=>{
+    const nextDue=t.doneAt+t.hours;const isDue=totalH>=nextDue;
+    return{...t,isDue,remaining:nextDue-totalH};
+  });
+}
+function setFinanceTab(tab,btn){
+  ['resumen','budgets','invoices'].forEach(t=>$('finance-tab-'+t).style.display='none');
+  $('finance-tab-'+tab).style.display='';
+  document.querySelectorAll('#page-finance .pill').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  if(tab==='budgets')initDocsTab('budget');
+  if(tab==='invoices')initDocsTab('invoice');
+}
+function initDocsTab(type){
+  const orders=window._data.orders;
+  const field=type==='budget'?'budgetNum':'invoiceNum';
+  const docs=orders.filter(o=>o[field]&&o[field]!=='');
+  // Populate year filter
+  const years=[...new Set(docs.map(o=>o.date?.slice(0,4)).filter(Boolean))].sort().reverse();
+  const yearSel=$(type==='budget'?'budget-filter-year':'invoice-filter-year');
+  yearSel.innerHTML=`<option value="all">Todos los años</option>`+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  renderDocsTab(type);
+}
+function renderDocsTab(type){
+  const orders=window._data.orders;
+  const field=type==='budget'?'budgetNum':'invoiceNum';
+  const yearSel=$(type==='budget'?'budget-filter-year':'invoice-filter-year');
+  const monthSel=$(type==='budget'?'budget-filter-month':'invoice-filter-month');
+  const filterYear=yearSel?.value||'all';
+  const filterMonth=monthSel?.value||'all';
+  let docs=orders.filter(o=>o[field]&&o[field]!=='');
+  if(filterYear!=='all')docs=docs.filter(o=>o.date?.startsWith(filterYear));
+  if(filterMonth!=='all')docs=docs.filter(o=>o.date?.slice(5,7)===filterMonth);
+  docs.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const tableId=type==='budget'?'budgets-table':'invoices-table';
+  const icon=type==='budget'?'📄':'🧾';
+  if(!docs.length){$(tableId).innerHTML=`<div class="empty"><div class="ei">${icon}</div><p>No hay ${type==='budget'?'presupuestos':'facturas'} con este filtro.</p></div>`;return;}
+  const total=docs.reduce((a,o)=>a+(o.totalOrder||0),0);
+  $(tableId).innerHTML=`<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${docs.length} documentos · Total: <strong style="color:var(--accent)">${fmt(total)}</strong></div>
+  <div class="tbl-wrap"><table><thead><tr><th><input type="checkbox" id="chk-all-${type}" onchange="toggleAllDocs('${type}',this)"> Todos</th><th>Nº Doc.</th><th>Fecha</th><th>Pieza</th><th>Cliente</th><th>Total</th><th></th></tr></thead><tbody>
+  ${docs.map(o=>`<tr>
+    <td><input type="checkbox" class="doc-chk-${type}" data-id="${o.id}"></td>
+    <td><span class="code-badge">${o[field]}</span></td>
+    <td>${fmtDate(o.date)}</td>
+    <td class="tdn">${o.pieceName}</td>
+    <td>${o.client||''} ${o.apellidos||''}</td>
+    <td style="color:var(--a2);font-weight:600">${fmt(o.totalOrder||0)}</td>
+    <td><button class="btn btn-ghost btn-sm btn-icon" onclick="genDocForOrder('${o.id}','${type==='budget'?'budget':'invoice'}')" title="Ver/Descargar">${icon}</button></td>
+  </tr>`).join('')}
+  </tbody></table></div>`;
+}
+function toggleAllDocs(type,chk){document.querySelectorAll(`.doc-chk-${type}`).forEach(c=>c.checked=chk.checked);}
+function downloadSelectedDocs(type){
+  const checked=[...document.querySelectorAll(`.doc-chk-${type}:checked`)].map(c=>c.dataset.id);
+  if(!checked.length){toast('Selecciona al menos un documento','red');return;}
+  const docType=type==='budget'?'budget':'invoice';
+  checked.forEach((id,i)=>{setTimeout(()=>{const o=window._data.orders.find(x=>x.id===id);if(o)generatePDF(docType,o);},i*800);});
+  toast(`Generando ${checked.length} ${type==='budget'?'presupuestos':'facturas'}…`,'green');
+}
 /* ════ CATALOG ════ */
 let editingCatalogId=null;
 function setOrdersTab(tab,btn){
   $('orders-tab-orders').style.display=tab==='orders'?'':'none';
   $('orders-tab-catalog').style.display=tab==='catalog'?'':'none';
-  document.querySelectorAll('#page-orders .ph-actions .btn-ghost').forEach(b=>b.classList.remove('active'));
-  if(btn)btn.classList.add('active');
+  const tabBtn=$('tab-catalog-btn');
+  if(tabBtn){tabBtn.textContent=tab==='catalog'?'← Pedidos':'📚 Catálogo';}
   if(tab==='catalog')renderCatalog();
 }
 function renderCatalog(){
