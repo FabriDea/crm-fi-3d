@@ -656,26 +656,29 @@ tr:hover td{background:var(--s2);}
 
 <!-- AJUSTES -->
 <div class="page" id="page-settings">
-  <div class="ph"><div><div class="ph-title">Ajustes</div><div class="ph-sub">Datos empresa y configuración</div></div></div>
-  <div class="card">
-    <div class="ct"><span class="dot"></span>Datos empresa (aparecen en presupuestos y facturas)</div>
+  <div class="ph"><div><div class="ph-title">⚙️ Ajustes</div><div class="ph-sub">Configuración global del CRM</div></div></div>
+
+  <!-- BLOQUE 1: DATOS DE EMPRESA -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="ct"><span class="dot"></span>🏢 Datos de empresa</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Aparecen en todos los presupuestos y facturas generados.</div>
     <div class="fr">
       <div class="field"><label>Nombre empresa / autónomo</label><input type="text" id="set-company" placeholder="Fabridea"></div>
       <div class="field"><label>NIF / CIF</label><input type="text" id="set-nif" placeholder="00000000X"></div>
     </div>
     <div class="fr">
       <div class="field"><label>Dirección</label><input type="text" id="set-address" placeholder="Calle, nº, ciudad"></div>
-      <div class="field"><label>Código postal</label><input type="text" id="set-cp" placeholder="28001 Madrid"></div>
+      <div class="field"><label>Código postal y ciudad</label><input type="text" id="set-cp" placeholder="28001 Madrid"></div>
     </div>
     <div class="fr">
       <div class="field"><label>Teléfono</label><input type="tel" id="set-phone" placeholder="600 000 000"></div>
       <div class="field"><label>Email</label><input type="email" id="set-email" placeholder="info@fabridea.com"></div>
     </div>
     <div class="field"><label>Web</label><input type="text" id="set-web" placeholder="www.fabridea.com"></div>
-    <div class="field"><label>Condiciones de pago</label><textarea id="set-conditions" placeholder="Ej: Validez 30 días. Pago 50% inicio, 50% entrega."></textarea></div>
+    <div class="field"><label>Condiciones de pago (aparecen al pie del documento)</label><textarea id="set-conditions" placeholder="Ej: Validez 30 días. Pago 50% inicio, 50% entrega."></textarea></div>
 
-    <div class="section-label">Logo de empresa (aparece en presupuestos y facturas)</div>
-    <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+    <div class="section-label" style="margin-top:14px">Logo de empresa</div>
+    <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:4px;">
       <div style="flex:1;min-width:200px;">
         <div class="file-upload-area" onclick="document.getElementById('logo-input').click()" id="logoUploadArea" style="padding:20px;">
           <input type="file" id="logo-input" style="display:none" accept="image/png,image/jpeg,image/svg+xml,image/webp" onchange="handleLogoUpload(this)">
@@ -689,17 +692,85 @@ tr:hover td{background:var(--s2);}
         <span id="logoPlaceholder" style="font-size:11px;color:var(--muted)">Sin logo</span>
       </div>
     </div>
+  </div>
 
-    <div class="section-label">Numeración correlativa</div>
+  <!-- BLOQUE 2: PREFERENCIAS DE CALCULADORA -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="ct"><span class="dot"></span>🧮 Preferencias de calculadora</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Valores por defecto al abrir la calculadora. Se aplican automáticamente cada vez.</div>
     <div class="fr">
-      <div class="field"><label>Próximo nº pedido (PIE-)</label><div class="iw"><input type="number" id="set-nextOrder" value="3469" min="1" step="1" class="hu"><span class="unit">#</span></div></div>
-      <div class="field"><label>Próximo nº cliente (CLI-)</label><div class="iw"><input type="number" id="set-nextClient" value="1" min="1" step="1" class="hu"><span class="unit">#</span></div></div>
+      <div class="field"><label>Precio kWh (€)</label><div class="iw"><input type="number" id="set-kwh" value="0.18" min="0" step="0.01" class="hu"><span class="unit">€</span></div></div>
+      <div class="field"><label>Consumo impresora (W)</label><div class="iw"><input type="number" id="set-watts" value="200" min="0" step="10" class="hu"><span class="unit">W</span></div></div>
     </div>
     <div class="fr">
+      <div class="field"><label>Coste impresora (€)</label><div class="iw"><input type="number" id="set-printerCost" value="1200" min="0" step="50" class="hu"><span class="unit">€</span></div></div>
+      <div class="field"><label>Vida útil impresora (h)</label><div class="iw"><input type="number" id="set-printerLife" value="5000" min="100" step="100" class="hu"><span class="unit">h</span></div></div>
+    </div>
+    <div class="fr">
+      <div class="field"><label>Mantenimiento anual (€)</label><div class="iw"><input type="number" id="set-maintenance" value="80" min="0" step="5" class="hu"><span class="unit">€</span></div></div>
+      <div class="field"><label>Precio hora mano de obra (€/h)</label><div class="iw"><input type="number" id="set-laborRate" value="15" min="0" step="0.5" class="hu"><span class="unit">€/h</span></div></div>
+    </div>
+    <div class="fr">
+      <div class="field"><label>Precio carrete genérico (€)</label><div class="iw"><input type="number" id="set-spoolPrice" value="22" min="0" step="0.5" class="hu"><span class="unit">€</span></div></div>
+      <div class="field"><label>Peso carrete genérico (g)</label><div class="iw"><input type="number" id="set-spoolWeight" value="1000" min="100" step="50" class="hu"><span class="unit">g</span></div></div>
+    </div>
+    <div class="fr">
+      <div class="field"><label>Coste embalaje (€)</label><div class="iw"><input type="number" id="set-packCost" value="1.5" min="0" step="0.1" class="hu"><span class="unit">€</span></div></div>
+      <div class="field"><label>Coste envío (€)</label><div class="iw"><input type="number" id="set-shipCost" value="4" min="0" step="0.5" class="hu"><span class="unit">€</span></div></div>
+    </div>
+  </div>
+
+  <!-- BLOQUE 3: NUMERACIÓN Y PREFIJOS -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="ct"><span class="dot"></span>🔢 Numeración de documentos</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Personaliza los prefijos y el número de inicio de cada secuencia correlativa.</div>
+    <div class="fr">
+      <div class="field"><label>Prefijo pedidos</label><input type="text" id="set-prefixOrder" placeholder="PIE-" maxlength="8"></div>
+      <div class="field"><label>Próximo nº pedido</label><div class="iw"><input type="number" id="set-nextOrder" value="3469" min="1" step="1" class="hu"><span class="unit">#</span></div></div>
+    </div>
+    <div class="fr">
+      <div class="field"><label>Prefijo clientes</label><input type="text" id="set-prefixClient" placeholder="CLI-" maxlength="8"></div>
+      <div class="field"><label>Próximo nº cliente</label><div class="iw"><input type="number" id="set-nextClient" value="1" min="1" step="1" class="hu"><span class="unit">#</span></div></div>
+    </div>
+    <div class="fr">
+      <div class="field"><label>Prefijo presupuestos</label><input type="text" id="set-prefixBudget" placeholder="PRES-" maxlength="8"></div>
       <div class="field"><label>Próximo nº presupuesto</label><div class="iw"><input type="number" id="set-nextBudget" value="1" min="1" step="1" class="hu"><span class="unit">#</span></div></div>
+    </div>
+    <div class="fr">
+      <div class="field"><label>Prefijo facturas</label><input type="text" id="set-prefixInvoice" placeholder="FAC-" maxlength="8"></div>
       <div class="field"><label>Próximo nº factura</label><div class="iw"><input type="number" id="set-nextInvoice" value="1" min="1" step="1" class="hu"><span class="unit">#</span></div></div>
     </div>
-    <div style="margin-top:14px;"><button class="btn btn-primary" onclick="saveSettings()">✓ Guardar ajustes</button></div>
+  </div>
+
+  <!-- BLOQUE 4: IMPUESTOS -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="ct"><span class="dot"></span>💶 Impuestos y fiscalidad</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Se aplican en la calculadora de costes y en los documentos PDF.</div>
+    <div class="fr">
+      <div class="field"><label>IVA por defecto (%)</label>
+        <select id="set-taxIVA" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 10px;width:100%;">
+          <option value="21">21% — General</option>
+          <option value="10">10% — Reducido</option>
+          <option value="4">4% — Superreducido</option>
+          <option value="0">0% — Exento</option>
+        </select>
+      </div>
+      <div class="field"><label>IRPF (%)</label><div class="iw"><input type="number" id="set-taxIRPF" value="15" min="0" max="50" step="1" class="hu"><span class="unit">%</span></div></div>
+    </div>
+    <div class="fr">
+      <div class="field"><label>Cuota autónomos mensual (€)</label><div class="iw"><input type="number" id="set-taxAutonomo" value="0" min="0" step="10" class="hu"><span class="unit">€/mes</span></div></div>
+      <div class="field"><label>Gestoría mensual (€)</label><div class="iw"><input type="number" id="set-taxGestoria" value="0" min="0" step="5" class="hu"><span class="unit">€/mes</span></div></div>
+    </div>
+    <div class="field"><label>Piezas estimadas al mes</label><div class="iw" style="max-width:160px"><input type="number" id="set-taxPiezasMes" value="20" min="1" step="1" class="hu"><span class="unit">uds</span></div></div>
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;font-size:11px;color:var(--muted);line-height:1.8;">
+      ℹ️ El IVA aparece en los documentos del cliente (presupuesto/factura).<br>
+      El IRPF es una obligación interna y <strong>no aparece en los documentos del cliente</strong>, solo en el cálculo de rentabilidad.
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="saveSettings()">✓ Guardar todos los ajustes</button>
+    <button class="btn btn-ghost btn-sm" onclick="applySettingsToCalc()">↺ Aplicar a calculadora ahora</button>
   </div>
 </div>
 
@@ -1030,13 +1101,22 @@ function initListeners(){
   onSnapshot(doc(db,'settings','main'),snap=>{
     if(snap.exists()){
       const d=snap.data();window._data.settings=d;
-      const fields={company:'set-company',nif:'set-nif',address:'set-address',cp:'set-cp',phone:'set-phone',email:'set-email',web:'set-web',conditions:'set-conditions',nextOrder:'set-nextOrder',nextClient:'set-nextClient',nextBudget:'set-nextBudget',nextInvoice:'set-nextInvoice'};
+      const fields={company:'set-company',nif:'set-nif',address:'set-address',cp:'set-cp',phone:'set-phone',email:'set-email',web:'set-web',conditions:'set-conditions',
+        nextOrder:'set-nextOrder',nextClient:'set-nextClient',nextBudget:'set-nextBudget',nextInvoice:'set-nextInvoice',
+        prefixOrder:'set-prefixOrder',prefixClient:'set-prefixClient',prefixBudget:'set-prefixBudget',prefixInvoice:'set-prefixInvoice',
+        taxIRPF:'set-taxIRPF',taxAutonomo:'set-taxAutonomo',taxGestoria:'set-taxGestoria',taxPiezasMes:'set-taxPiezasMes',
+        defKwh:'set-kwh',defWatts:'set-watts',defPrinterCost:'set-printerCost',defPrinterLife:'set-printerLife',
+        defMaintenance:'set-maintenance',defLaborRate:'set-laborRate',defSpoolPrice:'set-spoolPrice',
+        defSpoolWeight:'set-spoolWeight',defPackCost:'set-packCost',defShipCost:'set-shipCost'};
       Object.entries(fields).forEach(([k,id])=>{if(d[k]!==undefined&&document.getElementById(id))document.getElementById(id).value=d[k];});
+      // IVA select
+      if(d.taxIVA!==undefined&&$('set-taxIVA'))$('set-taxIVA').value=d.taxIVA;
+      // Tax fields in calculator
       const taxFields={taxIVA:'taxIVA',taxIRPF:'taxIRPF',taxAutonomo:'taxAutonomo',taxGestoria:'taxGestoria',taxPiezasMes:'taxPiezasMes'};
       Object.entries(taxFields).forEach(([k,id])=>{if(d[k]!==undefined&&document.getElementById(id))document.getElementById(id).value=d[k];});
       if(d.calcSettings)Object.assign(window._calcSettings,d.calcSettings);
       if(d.theme){document.documentElement.setAttribute('data-theme',d.theme);updateThemeBtn(d.theme);}
-      applyCalcSettings();calc();
+      applyCalcSettings();applySettingsToCalc();calc();
     }
   });
   setTimeout(()=>{document.getElementById('loadingScreen').classList.add('hidden');setSyncStatus('ok');},1500);
@@ -1129,10 +1209,10 @@ async function restoreFilamentStock(order){
 async function getNextCode(type){
   const s=window._data.settings||{};
   let num,field,prefix;
-  if(type==='order'){num=parseInt(s.nextOrder)||3469;field='nextOrder';prefix='PIE-';}
-  else if(type==='client'){num=parseInt(s.nextClient)||1;field='nextClient';prefix='CLI-';}
-  else if(type==='budget'){num=parseInt(s.nextBudget)||1;field='nextBudget';prefix='PRES-';}
-  else{num=parseInt(s.nextInvoice)||1;field='nextInvoice';prefix='FAC-';}
+  if(type==='order'){num=parseInt(s.nextOrder)||3469;field='nextOrder';prefix=s.prefixOrder||'PIE-';}
+  else if(type==='client'){num=parseInt(s.nextClient)||1;field='nextClient';prefix=s.prefixClient||'CLI-';}
+  else if(type==='budget'){num=parseInt(s.nextBudget)||1;field='nextBudget';prefix=s.prefixBudget||'PRES-';}
+  else{num=parseInt(s.nextInvoice)||1;field='nextInvoice';prefix=s.prefixInvoice||'FAC-';}
   const code=prefix+String(num).padStart(5,'0');
   window._data.settings[field]=num+1;
   if(window.dbOps)await window.dbOps.saveSettings({[field]:num+1});
@@ -1177,14 +1257,63 @@ function loadLogo(){
 
 /* ════ SETTINGS ════ */
 async function saveSettings(){
-  const data={company:$('set-company').value.trim(),nif:$('set-nif').value.trim(),address:$('set-address').value.trim(),cp:$('set-cp').value.trim(),phone:$('set-phone').value.trim(),email:$('set-email').value.trim(),web:$('set-web').value.trim(),conditions:$('set-conditions').value.trim(),nextOrder:parseInt($('set-nextOrder').value)||3469,nextClient:parseInt($('set-nextClient').value)||1,nextBudget:parseInt($('set-nextBudget').value)||1,nextInvoice:parseInt($('set-nextInvoice').value)||1};
+  const data={
+    company:$('set-company').value.trim(),nif:$('set-nif').value.trim(),
+    address:$('set-address').value.trim(),cp:$('set-cp').value.trim(),
+    phone:$('set-phone').value.trim(),email:$('set-email').value.trim(),
+    web:$('set-web').value.trim(),conditions:$('set-conditions').value.trim(),
+    // Numeración y prefijos
+    prefixOrder:$('set-prefixOrder').value.trim()||'PIE-',
+    prefixClient:$('set-prefixClient').value.trim()||'CLI-',
+    prefixBudget:$('set-prefixBudget').value.trim()||'PRES-',
+    prefixInvoice:$('set-prefixInvoice').value.trim()||'FAC-',
+    nextOrder:parseInt($('set-nextOrder').value)||3469,
+    nextClient:parseInt($('set-nextClient').value)||1,
+    nextBudget:parseInt($('set-nextBudget').value)||1,
+    nextInvoice:parseInt($('set-nextInvoice').value)||1,
+    // Impuestos
+    taxIVA:parseFloat($('set-taxIVA').value)||21,
+    taxIRPF:parseFloat($('set-taxIRPF').value)||15,
+    taxAutonomo:parseFloat($('set-taxAutonomo').value)||0,
+    taxGestoria:parseFloat($('set-taxGestoria').value)||0,
+    taxPiezasMes:parseInt($('set-taxPiezasMes').value)||20,
+    // Preferencias calculadora
+    defKwh:parseFloat($('set-kwh').value)||0.18,
+    defWatts:parseFloat($('set-watts').value)||200,
+    defPrinterCost:parseFloat($('set-printerCost').value)||1200,
+    defPrinterLife:parseFloat($('set-printerLife').value)||5000,
+    defMaintenance:parseFloat($('set-maintenance').value)||80,
+    defLaborRate:parseFloat($('set-laborRate').value)||15,
+    defSpoolPrice:parseFloat($('set-spoolPrice').value)||22,
+    defSpoolWeight:parseFloat($('set-spoolWeight').value)||1000,
+    defPackCost:parseFloat($('set-packCost').value)||1.5,
+    defShipCost:parseFloat($('set-shipCost').value)||4,
+  };
   Object.assign(window._data.settings,data);
   if(window.dbOps)await window.dbOps.saveSettings(data);
+  // Sync tax fields in calculator
+  if($('taxIVA'))$('taxIVA').value=data.taxIVA;
+  if($('taxIRPF'))$('taxIRPF').value=data.taxIRPF;
+  if($('taxAutonomo'))$('taxAutonomo').value=data.taxAutonomo;
+  if($('taxGestoria'))$('taxGestoria').value=data.taxGestoria;
+  if($('taxPiezasMes'))$('taxPiezasMes').value=data.taxPiezasMes;
+  applySettingsToCalc();
   toast('✓ Ajustes guardados','green');
+}
+function applySettingsToCalc(){
+  const s=window._data.settings||{};
+  const map={kwhPrice:'defKwh',printerWatts:'defWatts',printerCost:'defPrinterCost',printerLife:'defPrinterLife',maintenance:'defMaintenance',laborRate:'defLaborRate',spoolPrice:'defSpoolPrice',spoolWeight:'defSpoolWeight',packCost:'defPackCost',shipCost:'defShipCost'};
+  Object.entries(map).forEach(([calcId,settKey])=>{if(s[settKey]!==undefined&&$(calcId))$(calcId).value=s[settKey];});
+  calc();
 }
 function saveTaxes(){
   const data={taxIVA:vf('taxIVA'),taxIRPF:vf('taxIRPF'),taxAutonomo:vf('taxAutonomo'),taxGestoria:vf('taxGestoria'),taxPiezasMes:vf('taxPiezasMes')};
   Object.assign(window._data.settings,data);
+  if($('set-taxIVA'))$('set-taxIVA').value=data.taxIVA;
+  if($('set-taxIRPF'))$('set-taxIRPF').value=data.taxIRPF;
+  if($('set-taxAutonomo'))$('set-taxAutonomo').value=data.taxAutonomo;
+  if($('set-taxGestoria'))$('set-taxGestoria').value=data.taxGestoria;
+  if($('set-taxPiezasMes'))$('set-taxPiezasMes').value=data.taxPiezasMes;
   if(window.dbOps)window.dbOps.saveSettings(data);
 }
 
