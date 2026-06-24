@@ -590,6 +590,9 @@ tr:hover td{background:var(--s2);}
     <button class="pill" onclick="setOF('incidencia',this)">⚠️ Incidencia</button>
     <button class="pill" onclick="setOF('cancelado',this)">❌ Cancelado</button>
   </div>
+  <div class="pill-row" id="matFilterRow" style="margin-top:-6px">
+    <button class="pill active" onclick="setMatFilter('all',this)">🧵 Todos los materiales</button>
+  </div>
   <div id="orderTable"></div>
 </div>
 
@@ -1099,20 +1102,22 @@ const PRODUCTION_STATUSES=['impresion','postproceso','calidad','listo','enviado'
 async function deductFilamentStock(order){
   if(!order||order.stockDeducted)return false;
   const fu=order.filamentUsed;
-  if(!fu||!fu.materialId||!fu.totalGrams)return false;
+  if(!fu||!fu.materialId||!fu.gramsPerUnit)return false;
   const mat=(window._data.materials||[]).find(m=>m.id===fu.materialId);
   if(!mat)return false;
-  const newStock=Math.max((mat.stock||0)-fu.totalGrams,0);
+  const totalGrams=fmtR((fu.gramsPerUnit||0)*(order.qty||1));
+  const newStock=Math.max((mat.stock||0)-totalGrams,0);
   if(window.dbOps)await window.dbOps.updateMaterial(mat.id,{stock:fmtR(newStock)});
   return true;
 }
 async function restoreFilamentStock(order){
   if(!order||!order.stockDeducted)return false;
   const fu=order.filamentUsed;
-  if(!fu||!fu.materialId||!fu.totalGrams)return false;
+  if(!fu||!fu.materialId||!fu.gramsPerUnit)return false;
   const mat=(window._data.materials||[]).find(m=>m.id===fu.materialId);
   if(!mat)return false;
-  const newStock=(mat.stock||0)+fu.totalGrams;
+  const totalGrams=fmtR((fu.gramsPerUnit||0)*(order.qty||1));
+  const newStock=(mat.stock||0)+totalGrams;
   if(window.dbOps)await window.dbOps.updateMaterial(mat.id,{stock:fmtR(newStock)});
   return true;
 }
@@ -1246,8 +1251,12 @@ function populateFilamentInventory(){
     return `<option value="inv:${m.id}">${label}</option>`;
   }).join('');
   grp.style.display=spools.length?'':'none';
-  // Restore selection if still valid, otherwise keep current
   if(prevVal&&[...sel.options].some(o=>o.value===prevVal))sel.value=prevVal;
+  // Update material filter row in orders page
+  const row=$('matFilterRow');if(!row)return;
+  const currentMat=orderMatFilter;
+  row.innerHTML=`<button class="pill ${currentMat==='all'?'active':''}" onclick="setMatFilter('all',this)">🧵 Todos los materiales</button>`
+    +spools.map(m=>`<button class="pill ${currentMat===m.id?'active':''}" onclick="setMatFilter('${m.id}',this)">${m.type||'?'}${m.color?' · '+m.color:''}</button>`).join('');
 }
 function handleFilamentChange(){
   const val=$('filamentType').value;
@@ -1522,13 +1531,16 @@ function clearOrderForm(){['m-client','m-apellidos','m-phone','m-email','m-notes
 
 /* ════ ORDERS ════ */
 let orderFilter='all';
-function setOF(f,btn){orderFilter=f;document.querySelectorAll('.pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderOrders();}
+let orderMatFilter='all';
+function setOF(f,btn){orderFilter=f;document.querySelectorAll('#page-orders .pill-row:first-of-type .pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderOrders();}
+function setMatFilter(matId,btn){orderMatFilter=matId;document.querySelectorAll('#matFilterRow .pill').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderOrders();}
 function renderOrders(){
   let orders=window._data.orders;
   const q=($('orderSearch')?.value||'').toLowerCase();
   if(orderFilter!=='all')orders=orders.filter(o=>o.status===orderFilter);
+  if(orderMatFilter!=='all')orders=orders.filter(o=>o.filamentUsed&&o.filamentUsed.materialId===orderMatFilter);
   if(q)orders=orders.filter(o=>(o.pieceName+o.client+(o.code||'')+(o.notes||'')).toLowerCase().includes(q));
-  if(!orders.length){$('orderTable').innerHTML=`<div class="empty"><div class="ei">📦</div><p>${orderFilter==='all'&&!q?'Sin pedidos.<br>Ve a la <strong>Calculadora</strong> y guarda tu primer pedido.':'Sin pedidos con este filtro.'}</p></div>`;return;}
+  if(!orders.length){$('orderTable').innerHTML=`<div class="empty"><div class="ei">📦</div><p>${orderFilter==='all'&&orderMatFilter==='all'&&!q?'Sin pedidos.<br>Ve a la <strong>Calculadora</strong> y guarda tu primer pedido.':'Sin pedidos con este filtro.'}</p></div>`;return;}
   $('orderTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Pieza</th><th>Cliente</th><th>Fecha</th><th>Uds</th><th>Coste</th><th>Total</th><th>Margen</th><th>Estado</th><th>Docs</th><th></th></tr></thead><tbody>${orders.map(o=>{const s=STATUS_CFG[o.status]||{icon:'?',label:o.status,color:'var(--muted)'};const fileBtn=o.fileUrl?`<a href="${o.fileUrl}" target="_blank" class="btn btn-ghost btn-sm btn-icon" title="${o.fileName||'Archivo'}">📁</a>`:'';const qty=o.qty||1;const costTotal=(o.costPerPiece||0)*qty;const margin=(o.totalOrder||0)-costTotal;const marginColor=margin>0?'var(--accent)':(margin<0?'var(--red)':'var(--muted)');const fu=o.filamentUsed;const subBits=[];if(fu&&fu.gramsPerUnit)subBits.push(`🧵 ${fu.gramsPerUnit}g`);if(o.printMinutes)subBits.push(`⏱ ${o.printMinutes}min`);const subline=subBits.length?`<div style="font-size:10px;color:var(--muted);margin-top:2px;">${subBits.join(' · ')}</div>`:'';return`<tr><td><span class="code-badge">${o.code||'—'}</span></td><td class="tdn">${o.pieceName}${subline}</td><td>${o.client||''}${o.apellidos?' '+o.apellidos:''}</td><td>${fmtDate(o.date)}</td><td>${qty}</td><td style="color:var(--red);font-weight:600">${fmt(costTotal)}</td><td style="color:var(--a2);font-weight:600">${fmt(o.totalOrder||0)}</td><td style="color:${marginColor};font-weight:600">${fmt(margin)}</td><td><select style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:${s.color};font-size:10px;padding:3px 5px;cursor:pointer;font-family:'DM Mono',monospace;max-width:140px;" onchange="changeOrderStatus('${o.id}',this)">${Object.entries(STATUS_CFG).map(([k,v])=>`<option value="${k}" ${o.status===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}</select></td><td style="display:flex;gap:3px;">${fileBtn}<button class="btn btn-orange btn-sm btn-icon" onclick="genDocForOrder('${o.id}','budget')" title="Presupuesto">📄</button><button class="btn btn-blue btn-sm btn-icon" onclick="genDocForOrder('${o.id}','invoice')" title="Factura">🧾</button></td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="showOrderDetail('${o.id}')" title="Detalles">ℹ️</button><button class="btn btn-ghost btn-sm btn-icon" onclick="openEditOrder('${o.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteOrder('${o.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;
 }
 async function genDocForOrder(id,type){
@@ -1694,7 +1706,7 @@ function showOrderDetail(id){
   $('odm-body').innerHTML=`
     <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Material</div>
     <div style="font-size:12px;color:var(--text);margin-bottom:4px">🧵 Carrete: ${spoolLine}</div>
-    <div style="font-size:12px;color:var(--text);margin-bottom:12px">⚖️ ${fu?fu.gramsPerUnit:'—'}g/ud · ${fu?fu.totalGrams:'—'}g total (${o.qty||1} uds)</div>
+    <div style="font-size:12px;color:var(--text);margin-bottom:12px">⚖️ ${fu?fu.gramsPerUnit:'—'}g/ud · ${fu?(fmtR((fu.gramsPerUnit||0)*(o.qty||1))):'—'}g total (${o.qty||1} uds)</div>
     <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Tiempos</div>
     <div style="font-size:12px;color:var(--text);margin-bottom:12px">⏱ Impresión: ${o.printMinutes||0}min · Mano de obra: ${o.laborMinutes||0}min · Post-proceso: ${o.postMinutes||0}min</div>
     <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Desglose de coste (por unidad)</div>
