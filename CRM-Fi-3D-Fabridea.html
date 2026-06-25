@@ -182,7 +182,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 /* TABLES */
 .tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border);-webkit-overflow-scrolling:touch;}
-@media(max-width:700px){.tbl-wrap table th.hide-mobile,.tbl-wrap table td.hide-mobile{display:none;}}
+.tbl-wrap table{width:100%;border-collapse:collapse;}
+.tbl-wrap table td,.tbl-wrap table th{vertical-align:middle;}
+@media(max-width:700px){
+  .tbl-wrap table th.hide-mobile,.tbl-wrap table td.hide-mobile{display:none;}
+  .tbl-wrap table td:last-child{white-space:nowrap;}
+  .btn-icon{width:28px;height:28px;padding:0;font-size:13px;}
+}
 table{width:100%;border-collapse:collapse;font-size:13px;}
 @media(min-width:900px){table{font-size:14px;}}
 th{background:var(--s2);padding:11px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;font-family:'Inter',sans-serif;}
@@ -615,7 +621,6 @@ tr:hover td{background:var(--s2);}
   <div id="orders-tab-catalog" style="display:none">
     <div class="ph" style="margin-bottom:14px;">
       <div>
-        <button class="btn btn-ghost btn-sm" onclick="setOrdersTab('orders',null)" style="margin-bottom:6px;">← Volver a pedidos</button>
         <div style="font-size:13px;color:var(--muted)">Piezas guardadas para reutilizar. Pulsa ▶ para lanzar un pedido rápido.</div>
       </div>
       <button class="btn btn-primary btn-sm" onclick="openCatalogModal()">＋ Nueva pieza</button>
@@ -847,12 +852,29 @@ tr:hover td{background:var(--s2);}
         <label>Cargar perfil predefinido</label>
         <select id="set-printer-preset" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:9px 10px;width:100%;">
           <option value="">— Selecciona impresora —</option>
-          <option value="bambu-p2s">Bambu Lab P2S</option>
-          <option value="bambu-x1c">Bambu Lab X1C</option>
-          <option value="bambu-a1">Bambu Lab A1</option>
-          <option value="prusa-mk4">Prusa MK4</option>
-          <option value="creality-k1">Creality K1</option>
-          <option value="custom">Personalizada (manual)</option>
+          <optgroup label="Bambu Lab">
+            <option value="bambu-p2s">Bambu Lab P2S</option>
+            <option value="bambu-p1s">Bambu Lab P1S</option>
+            <option value="bambu-x1c">Bambu Lab X1C</option>
+            <option value="bambu-a1">Bambu Lab A1</option>
+            <option value="bambu-h2s">Bambu Lab H2S</option>
+          </optgroup>
+          <optgroup label="Prusa">
+            <option value="prusa-mk4">Prusa MK4</option>
+            <option value="prusa-xl">Prusa XL</option>
+            <option value="prusa-mini">Prusa MINI+</option>
+          </optgroup>
+          <optgroup label="Creality">
+            <option value="creality-k1">Creality K1</option>
+            <option value="creality-k1max">Creality K1 Max</option>
+            <option value="creality-ender3v3">Creality Ender 3 V3</option>
+          </optgroup>
+          <optgroup label="Otras">
+            <option value="voron-24">Voron 2.4</option>
+            <option value="ankermake-m5">AnkerMake M5</option>
+            <option value="flashforge-ad5m">Flashforge AD5M</option>
+            <option value="custom">Personalizada (manual)</option>
+          </optgroup>
         </select>
       </div>
       <button class="btn btn-ghost btn-sm" style="white-space:nowrap;flex-shrink:0" onclick="loadPrinterPreset()">↓ Cargar</button>
@@ -1625,14 +1647,15 @@ function resetCalc(){const d={filamentWeight:50,spoolPrice:22,spoolWeight:1000,p
 /* ════ PDF — SOLO IVA AL CLIENTE ════ */
 function generatePDF(type, orderData){
   const s=window._data.settings||{};
-  const docNum=type==='budget'?(orderData.budgetNum||'PRES-?'):(orderData.invoiceNum||'FAC-?');
+  const docNum=orderData._docNum||(type==='budget'?(orderData.budgetNum||'PRES-?'):(orderData.invoiceNum||'FAC-?'));
   const title=type==='budget'?'PRESUPUESTO':'FACTURA';
-  const qty=orderData.qty||1;
-  const unitPrice=orderData.pricePerPiece||0;
-  const subtotal=unitPrice*qty;
   const ivaRate=(s.taxIVA||21)/100;
+
+  // Use custom lines if provided, otherwise fall back to single line
+  const lines=orderData._customLines||[{desc:orderData.pieceName||'Pieza 3D personalizada',qty:orderData.qty||1,price:orderData.pricePerPiece||0,notes:orderData.notes,fileName:orderData.fileName}];
+  const subtotal=lines.reduce((a,l)=>a+(l.qty||1)*(l.price||0),0);
   const ivaAmount=subtotal*ivaRate;
-  const total=subtotal+ivaAmount; // Solo IVA al cliente, sin IRPF
+  const total=subtotal+ivaAmount;
 
   const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${title} ${docNum}</title>
   <style>
@@ -1672,7 +1695,7 @@ function generatePDF(type, orderData){
   </style></head><body><div class="doc">
     <div class="hdr">
       <div>
-        ${window._logoDataUrl?`<img src="${window._logoDataUrl}" alt="Logo Fabridea" style="max-height:70px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;">`:`<div class="logo">${s.company||'Fabridea'}<span> ·</span></div>`}
+        ${window._logoDataUrl?`<img src="${window._logoDataUrl}" alt="Logo" style="max-height:70px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;">`:`<div class="logo">${s.company||'Fabridea'}<span> ·</span></div>`}
         <div class="logo-sub">
           NIF: ${s.nif||'—'}<br>
           ${s.address||''} ${s.cp?'· '+s.cp:''}<br>
@@ -1700,23 +1723,19 @@ function generatePDF(type, orderData){
       </div>
     </div>
     <div class="ref-bar">
-      <div class="ref-item"><div class="ref-label">Ref. pieza</div><div class="ref-val"><span class="ref-code">${orderData.code||'—'}</span></div></div>
+      <div class="ref-item"><div class="ref-label">Ref. pedido</div><div class="ref-val"><span class="ref-code">${orderData.code||'—'}</span></div></div>
       <div class="ref-item"><div class="ref-label">Descripción</div><div class="ref-val">${orderData.pieceName||''}</div></div>
       <div class="ref-item"><div class="ref-label">Fecha pedido</div><div class="ref-val">${fmtDate(orderData.date)}</div></div>
     </div>
     <table>
       <thead><tr><th>Descripción</th><th style="text-align:center">Uds</th><th style="text-align:right">Precio/u</th><th style="text-align:right">Total</th></tr></thead>
       <tbody>
-        <tr>
-          <td>
-            <strong>${orderData.pieceName||'Pieza 3D personalizada'}</strong>
-            ${orderData.fileName?`<br><span style="font-size:11px;color:#9ca3af">Archivo: ${orderData.fileName}</span>`:''}
-            ${orderData.notes?`<br><span style="font-size:11px;color:#6b7280">${orderData.notes}</span>`:''}
-          </td>
-          <td style="text-align:center">${qty}</td>
-          <td style="text-align:right">${unitPrice.toFixed(2).replace('.',',')} €</td>
-          <td style="text-align:right;font-weight:600">${subtotal.toFixed(2).replace('.',',')} €</td>
-        </tr>
+        ${lines.map(l=>`<tr>
+          <td><strong>${l.desc||''}</strong>${l.notes?`<br><span style="font-size:11px;color:#6b7280">${l.notes}</span>`:''}${l.fileName?`<br><span style="font-size:11px;color:#9ca3af">Archivo: ${l.fileName}</span>`:''}</td>
+          <td style="text-align:center">${l.qty||1}</td>
+          <td style="text-align:right">${(l.price||0).toFixed(2).replace('.',',')} €</td>
+          <td style="text-align:right;font-weight:600">${((l.qty||1)*(l.price||0)).toFixed(2).replace('.',',')} €</td>
+        </tr>`).join('')}
       </tbody>
     </table>
     <div class="totals">
@@ -1728,7 +1747,7 @@ function generatePDF(type, orderData){
       </div>
     </div>
     ${s.conditions?`<div class="conditions"><div class="cond-title">Condiciones</div>${s.conditions}</div>`:''}
-    <div class="footer">${s.company||'Fabridea'} · ${s.web||''} · ${s.email||''} · Generado con CRM Fi 3D · Fabridea</div>
+    <div class="footer">${s.company||'Fabridea'} · ${s.web||''} · ${s.email||''} · Generado con CRM Fi 3D</div>
   </div></body></html>`;
 
   const win=window.open('','_blank');
@@ -1835,84 +1854,133 @@ async function genDocForOrder(id,type){
   const o=window._data.orders.find(x=>x.id===id);if(!o)return;
   const existing=type==='budget'?o.budgetNum:o.invoiceNum;
   const label=type==='budget'?'presupuesto':'factura';
-  const prefix=type==='budget'?'PRES-':'FAC-';
 
-  if(existing){
-    // Ya tiene número — preguntar si regenerar o crear nuevo
-    const choice=await showDocModal(type,o,existing);
-    if(!choice)return;
-    if(choice==='reprint'){
-      generatePDF(type,{...o});
-    } else if(choice==='new'){
-      const docNum=await getNextCode(type);
-      const upd=type==='budget'?{budgetNum:docNum}:{invoiceNum:docNum};
-      if(window.dbOps)await window.dbOps.updateOrder(id,upd);
-      Object.assign(o,upd);
-      generatePDF(type,{...o});
-      toast(`✓ ${label.charAt(0).toUpperCase()+label.slice(1)} ${docNum} emitida`,'green');
-    }
-  } else {
-    // No tiene número — confirmar antes de asignar
-    const confirmed=await showDocModal(type,o,null);
-    if(!confirmed)return;
-    const docNum=await getNextCode(type);
-    const upd=type==='budget'?{budgetNum:docNum}:{invoiceNum:docNum};
+  // Build default lines from order data
+  const defaultLines=buildDefaultLines(o,type);
+  // If invoice and has budget lines saved, inherit them
+  let inheritedLines=defaultLines;
+  if(type==='invoice'&&o.budgetLines&&o.budgetLines.length){
+    inheritedLines=o.budgetLines.map(l=>({...l}));
+  }
+
+  // Open document editor modal
+  const result=await showDocEditorModal(type,o,existing,inheritedLines);
+  if(!result)return;
+
+  const {lines,action}=result;
+  let docNum=existing;
+  if(action==='new'||!existing){
+    docNum=await getNextCode(type);
+    const field=type==='budget'?'budgetNum':'invoiceNum';
+    const lineField=type==='budget'?'budgetLines':'invoiceLines';
+    const upd={[field]:docNum,[lineField]:lines};
     if(window.dbOps)await window.dbOps.updateOrder(id,upd);
     Object.assign(o,upd);
-    generatePDF(type,{...o});
     toast(`✓ ${label.charAt(0).toUpperCase()+label.slice(1)} ${docNum} emitida`,'green');
+  } else {
+    // Reprint — just save lines
+    const lineField=type==='budget'?'budgetLines':'invoiceLines';
+    if(window.dbOps)await window.dbOps.updateOrder(id,{[lineField]:lines});
+    Object.assign(o,{[lineField]:lines});
   }
+  generatePDFWithLines(type,{...o},lines,docNum);
 }
 
-function showDocModal(type,order,existing){
+function buildDefaultLines(order,type){
+  const qty=order.qty||1;
+  const lines=[{desc:order.pieceName||'Pieza',qty,price:order.pricePerPiece||0}];
+  const b=order.breakdown||{};
+  // Only add packaging/shipping if they have value and it's a budget
+  if((b.pk||0)>0)lines.push({desc:'Embalaje',qty:1,price:b.pk});
+  if((b.sh||0)>0)lines.push({desc:'Envío',qty:1,price:b.sh});
+  return lines;
+}
+
+function showDocEditorModal(type,order,existing,lines){
   return new Promise(resolve=>{
     const label=type==='budget'?'Presupuesto':'Factura';
     const icon=type==='budget'?'📄':'🧾';
     const s=window._data.settings||{};
-    const nextNum=(type==='budget'?(parseInt(s.nextBudget)||1):(parseInt(s.nextInvoice)||1));
-    const nextPrefix=type==='budget'?'PRES-':'FAC-';
+    const nextNum=type==='budget'?(parseInt(s.nextBudget)||1):(parseInt(s.nextInvoice)||1);
+    const nextPrefix=type==='budget'?(s.prefixBudget||'PRES-'):(s.prefixInvoice||'FAC-');
     const nextCode=nextPrefix+String(nextNum).padStart(5,'0');
+    let currentLines=[...lines.map(l=>({...l}))];
 
-    // Remove any existing doc modal
-    const old=document.getElementById('_docConfirmModal');if(old)old.remove();
-
+    const old=document.getElementById('_docEditorModal');if(old)old.remove();
     const div=document.createElement('div');
-    div.id='_docConfirmModal';
-    div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);z-index:600;display:flex;align-items:center;justify-content:center;padding:16px;';
+    div.id='_docEditorModal';
+    div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(4px);z-index:600;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;';
 
-    if(existing){
-      div.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;max-width:440px;width:100%;">
-        <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;margin-bottom:6px;">${icon} ${label} ya emitida</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Este pedido ya tiene asignado el número <strong style="color:var(--a3)">${existing}</strong>. ¿Qué quieres hacer?</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <button onclick="document.getElementById('_docConfirmModal').remove();arguments[0].stopPropagation();" id="_btn_reprint" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Mono',monospace;font-size:11px;padding:10px 14px;cursor:pointer;text-align:left;">🖨 Reimprimir ${existing} <span style="color:var(--muted);font-size:10px;display:block;margin-top:2px;">No se asigna número nuevo</span></button>
-          <button onclick="document.getElementById('_docConfirmModal').remove();arguments[0].stopPropagation();" id="_btn_new" style="background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.2);border-radius:8px;color:var(--a2);font-family:'DM Mono',monospace;font-size:11px;padding:10px 14px;cursor:pointer;text-align:left;">📝 Emitir nueva ${nextCode} <span style="color:var(--muted);font-size:10px;display:block;margin-top:2px;">Se asignará número nuevo y consumirá ${nextCode}</span></button>
-          <button onclick="document.getElementById('_docConfirmModal').remove();" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;padding:8px 14px;cursor:pointer;">Cancelar</button>
-        </div>
-      </div>`;
-      div.querySelector('#_btn_reprint').addEventListener('click',()=>resolve('reprint'));
-      div.querySelector('#_btn_new').addEventListener('click',()=>resolve('new'));
-      div.addEventListener('click',e=>{if(e.target===div){div.remove();resolve(null);}});
-    } else {
-      div.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;max-width:440px;width:100%;">
-        <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;margin-bottom:6px;">${icon} Emitir ${label}</div>
-        <div style="font-size:12px;color:var(--soft);margin-bottom:4px;">Pieza: <strong style="color:var(--text)">${order.pieceName}</strong></div>
-        <div style="font-size:12px;color:var(--soft);margin-bottom:16px;">Cliente: <strong style="color:var(--text)">${order.client} ${order.apellidos||''}</strong></div>
-        <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:16px;">
-          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Se asignará el número</div>
-          <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--a3);">${nextCode}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px;">⚠️ Este número no se puede recuperar si cancelas después.</div>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button onclick="document.getElementById('_docConfirmModal').remove();" style="flex:1;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;padding:10px;cursor:pointer;">Cancelar</button>
-          <button id="_btn_confirm" style="flex:2;background:linear-gradient(135deg,#ea6c00,#ff6b35);border:none;border-radius:8px;color:#fff;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;padding:10px;cursor:pointer;">${icon} Confirmar y emitir ${nextCode}</button>
-        </div>
-      </div>`;
-      div.querySelector('#_btn_confirm').addEventListener('click',()=>{div.remove();resolve('confirm');});
-      div.addEventListener('click',e=>{if(e.target===div){div.remove();resolve(null);}});
+    function renderLines(){
+      const tbody=div.querySelector('#_doc_lines');if(!tbody)return;
+      tbody.innerHTML=currentLines.map((l,i)=>`<tr>
+        <td><input value="${l.desc||''}" placeholder="Concepto" onchange="window._docLines[${i}].desc=this.value" style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;width:100%;"></td>
+        <td><input type="number" value="${l.qty||1}" min="1" step="1" onchange="window._docLines[${i}].qty=parseFloat(this.value)||1;updateDocTotal()" style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;width:60px;text-align:center;"></td>
+        <td><input type="number" value="${(l.price||0).toFixed(2)}" min="0" step="0.01" onchange="window._docLines[${i}].price=parseFloat(this.value)||0;updateDocTotal()" style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;width:80px;text-align:right;"></td>
+        <td style="text-align:right;font-weight:600;font-size:12px;color:var(--a2);min-width:70px;">${fmt((l.qty||1)*(l.price||0))}</td>
+        <td><button onclick="window._docLines.splice(${i},1);window._rerenderDocLines();updateDocTotal()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">🗑</button></td>
+      </tr>`).join('');
+      updateDocTotal();
     }
+
+    window._docLines=currentLines;
+    window._rerenderDocLines=renderLines;
+    window.updateDocTotal=function(){
+      const total=window._docLines.reduce((a,l)=>a+(l.qty||1)*(l.price||0),0);
+      const iva=(total*(s.taxIVA||21)/100);
+      const el=div.querySelector('#_doc_total');
+      if(el)el.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;"><span style="color:var(--muted)">Subtotal</span><span>${fmt(total)}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;"><span style="color:var(--muted)">IVA ${s.taxIVA||21}%</span><span>${fmt(iva)}</span></div><div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;padding:6px 0 0;border-top:1px solid var(--border);margin-top:4px;"><span>TOTAL</span><span style="color:var(--a2)">${fmt(total+iva)}</span></div>`;
+    };
+
+    div.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:560px;width:100%;margin-top:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;">${icon} Editar ${label}</div>
+        <button onclick="document.getElementById('_docEditorModal').remove();resolve(null);" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;">✕</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
+        ${order.pieceName} · ${order.client||''} ${order.apellidos||''}
+        ${existing?`· <span style="color:var(--a3)">${existing}</span>`:''}
+      </div>
+      <div style="overflow-x:auto;margin-bottom:10px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:6px 4px;color:var(--muted);font-size:10px;letter-spacing:1px;">CONCEPTO</th>
+            <th style="text-align:center;padding:6px 4px;color:var(--muted);font-size:10px;">UDS</th>
+            <th style="text-align:right;padding:6px 4px;color:var(--muted);font-size:10px;">PRECIO/U</th>
+            <th style="text-align:right;padding:6px 4px;color:var(--muted);font-size:10px;">TOTAL</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="_doc_lines"></tbody>
+        </table>
+      </div>
+      <button onclick="window._docLines.push({desc:'',qty:1,price:0});window._rerenderDocLines();" style="background:var(--s2);border:1px dashed var(--border);border-radius:8px;color:var(--muted);font-size:11px;padding:7px 14px;cursor:pointer;width:100%;margin-bottom:12px;">＋ Añadir línea</button>
+      <div id="_doc_total" style="background:var(--s2);border-radius:8px;padding:10px 14px;margin-bottom:14px;"></div>
+      <div style="background:rgba(255,107,53,.07);border:1px solid rgba(255,107,53,.15);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--muted);">
+        ${existing?`Este pedido ya tiene el número <strong style="color:var(--a3)">${existing}</strong>.`:`Se asignará el número <strong style="color:var(--a3)">${nextCode}</strong>.`}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="document.getElementById('_docEditorModal').remove();" style="flex:1;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:11px;padding:10px;cursor:pointer;">Cancelar</button>
+        ${existing?`<button id="_btn_reprint" style="flex:2;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:11px;padding:10px;cursor:pointer;">🖨 Reimprimir ${existing}</button>`:''}
+        <button id="_btn_emit" style="flex:2;background:linear-gradient(135deg,#ea6c00,#ff6b35);border:none;border-radius:8px;color:#fff;font-size:11px;font-weight:700;padding:10px;cursor:pointer;">${icon} ${existing?'Emitir nueva '+nextCode:'Confirmar y emitir '+nextCode}</button>
+      </div>
+    </div>`;
+
+    // Bind close button resolve
+    div.querySelector('button[onclick*="resolve"]')?.addEventListener('click',()=>{div.remove();resolve(null);});
+    const reprintBtn=div.querySelector('#_btn_reprint');
+    if(reprintBtn)reprintBtn.addEventListener('click',()=>{currentLines=[...window._docLines];div.remove();resolve({lines:currentLines,action:'reprint'});});
+    div.querySelector('#_btn_emit').addEventListener('click',()=>{currentLines=[...window._docLines];div.remove();resolve({lines:currentLines,action:existing?'new':'confirm'});});
+    div.addEventListener('click',e=>{if(e.target===div){div.remove();resolve(null);}});
+
     document.body.appendChild(div);
+    renderLines();
   });
+}
+
+function generatePDFWithLines(type,order,lines,docNum){
+  // Use lines for the PDF instead of the default single-line
+  const overrideOrder={...order,_customLines:lines,_docNum:docNum};
+  generatePDF(type,overrideOrder);
 }
 function openEditOrder(id){const o=window._data.orders.find(x=>x.id===id);if(!o)return;$('eo-id').value=id;$('eo-code-display').textContent=o.code||'';$('eo-piece').value=o.pieceName||'';$('eo-status').value=o.status||'solicitud';$('eo-client').value=o.client||'';$('eo-apellidos').value=o.apellidos||'';$('eo-phone').value=o.phone||'';$('eo-email').value=o.email||'';$('eo-qty').value=o.qty||1;$('eo-date').value=o.date||today();$('eo-cost').value=o.costPerPiece||0;$('eo-price').value=o.pricePerPiece||0;$('eo-budget').value=o.budgetNum||'';$('eo-invoice').value=o.invoiceNum||'';$('eo-notes').value=o.notes||'';$('eo-grams').value='';
   // Mostrar archivo actual si existe
@@ -2065,7 +2133,7 @@ function renderMaterials(){let mats=window._data.materials||[];
   if(sortMode==='stock-asc')mats.sort((a,b)=>(a.stock||0)-(b.stock||0));
   else if(sortMode==='stock-desc')mats.sort((a,b)=>(b.stock||0)-(a.stock||0));
   else if(sortMode==='name')mats.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  if(!mats.length){$('materialTable').innerHTML=`<div class="empty"><div class="ei">🧵</div><p>${matFilter==='all'?'Sin materiales.<br>Añade filamentos, impresoras y consumibles.':'Sin materiales con este filtro.'}</p></div>`;return;}const catIcon={filamento:'🧵',impresora:'🖨',consumible:'🔧',quimico:'🧪',otro:'📦'};$('materialTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Cat.</th><th>Material</th><th>Detalle</th><th>Precio</th><th>Stock</th><th>Mín.</th><th>Proveedor</th><th></th></tr></thead><tbody>${mats.map(m=>{const unit=m.cat==='filamento'?'g':'uds';const isLow=m.minStock>0&&m.stock<=m.minStock;return`<tr><td><span class="tag">${catIcon[m.cat]||'📦'} ${m.cat||'otro'}</span></td><td class="tdn">${m.name}</td><td style="font-size:11px;color:var(--muted)">${m.type||m.model||'—'}${m.color?' · '+m.color:''}</td><td>${m.price?fmt(m.price):'—'}</td><td><span class="badge ${isLow?'b-low':'b-ok'}">${m.stock} ${unit}</span></td><td style="color:var(--muted)">${m.minStock} ${unit}</td><td style="font-size:11px;color:var(--muted)">${m.supplier||'—'}</td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="openMaterialModal('${m.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteMaterial('${m.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;}
+  if(!mats.length){$('materialTable').innerHTML=`<div class="empty"><div class="ei">🧵</div><p>${matFilter==='all'?'Sin materiales.<br>Añade filamentos, impresoras y consumibles.':'Sin materiales con este filtro.'}</p></div>`;return;}const catIcon={filamento:'🧵',impresora:'🖨',consumible:'🔧',quimico:'🧪',otro:'📦'};$('materialTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th class="hide-mobile">Cat.</th><th>Material</th><th>Stock</th><th class="hide-mobile">Mín.</th><th class="hide-mobile">Precio</th><th class="hide-mobile">Proveedor</th><th></th></tr></thead><tbody>${mats.map(m=>{const unit=m.cat==='filamento'?'g':'uds';const isLow=m.minStock>0&&m.stock<=m.minStock;return`<tr><td class="hide-mobile"><span class="tag">${catIcon[m.cat]||'📦'} ${m.cat||'otro'}</span></td><td class="tdn"><div style="font-weight:600">${m.name}</div><div style="font-size:10px;color:var(--muted)">${catIcon[m.cat]||'📦'} ${m.type||m.model||''}${m.color?' · '+m.color:''}</div></td><td><span class="badge ${isLow?'b-low':'b-ok'}">${m.stock} ${unit}</span></td><td class="hide-mobile" style="color:var(--muted)">${m.minStock} ${unit}</td><td class="hide-mobile">${m.price?fmt(m.price):'—'}</td><td class="hide-mobile" style="font-size:11px;color:var(--muted)">${m.supplier||'—'}</td><td style="display:flex;gap:3px;"><button class="btn btn-ghost btn-sm btn-icon" onclick="openMaterialModal('${m.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteMaterial('${m.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;}
 async function deleteMaterial(id){if(!confirm('¿Eliminar?'))return;if(window.dbOps)await window.dbOps.deleteMaterial(id);toast('Material eliminado','red');}
 
 /* ════ FINANCE ════ */
@@ -2163,8 +2231,20 @@ const PRINTER_PRESETS={
       {id:'idler-lube',name:'Lubricación poleas tensoras XY',hours:300,description:'Lubricar ejes de las poleas tensoras frontales y traseras.',url:'https://wiki.bambulab.com/en/p2s/maintenance/idler-pulley-lubrication'},
       {id:'hotend-clean',name:'Limpieza hotend y boquilla',hours:200,description:'Calentar boquilla a 250°C y limpiar. Limpiar bloque calefactor. Usar guantes resistentes al calor.',url:'https://wiki.bambulab.com/es/p2s/maintenance/period-maintenance'},
       {id:'fans-clean',name:'Limpieza ventiladores',hours:400,description:'Limpiar ventilador de pieza y ventilador del fusor. Retirar polvo acumulado.',url:'https://wiki.bambulab.com/es/p2s/maintenance/period-maintenance'},
-      {id:'cutter-check',name:'Revisión cortador filamento',hours:250,description:'Revisar cuchillas del cortador (equivale a ~10 bobinas). Reemplazar si están desafiladas.',url:'https://wiki.bambulab.com/es/p2s/maintenance/period-maintenance'},
+      {id:'cutter-check',name:'Revisión cortador filamento',hours:250,description:'Revisar cuchillas del cortador (~10 bobinas). Reemplazar si están desafiladas.',url:'https://wiki.bambulab.com/es/p2s/maintenance/period-maintenance'},
       {id:'calibration',name:'Calibración completa',hours:200,description:'Ejecutar calibración completa desde pantalla tras cualquier mantenimiento mecánico.',url:'https://wiki.bambulab.com/es/p2s/maintenance/period-maintenance'},
+    ]
+  },
+  'bambu-p1s':{
+    name:'Bambu Lab P1S',
+    manualUrl:'https://wiki.bambulab.com/en/p1s/maintenance',
+    tasks:[
+      {id:'xy-lube',name:'Lubricación ejes XY',hours:150,description:'Limpiar y lubricar guías lineales X e Y con aceite Bambu Lab.',url:'https://wiki.bambulab.com/en/p1s/maintenance'},
+      {id:'z-lube',name:'Mantenimiento eje Z',hours:300,description:'Lubricar husillo Z y rodamientos. Mover plataforma arriba/abajo varias veces.',url:'https://wiki.bambulab.com/en/p1s/maintenance'},
+      {id:'hotend-clean',name:'Limpieza hotend',hours:200,description:'Calentar boquilla a 250°C y limpiar. Limpiar bloque calefactor.',url:'https://wiki.bambulab.com/en/p1s/maintenance'},
+      {id:'fans-clean',name:'Limpieza ventiladores y cámara',hours:400,description:'Limpiar ventiladores y filtro de cámara cerrada.',url:'https://wiki.bambulab.com/en/p1s/maintenance'},
+      {id:'cutter-check',name:'Revisión cortador AMS',hours:250,description:'Revisar cuchillas del cortador de filamento del AMS.',url:'https://wiki.bambulab.com/en/p1s/maintenance'},
+      {id:'calibration',name:'Calibración completa',hours:200,description:'Calibración completa tras mantenimiento mecánico.',url:'https://wiki.bambulab.com/en/p1s/maintenance'},
     ]
   },
   'bambu-x1c':{name:'Bambu Lab X1C',manualUrl:'https://wiki.bambulab.com/en/x1/maintenance',tasks:[
@@ -2178,14 +2258,58 @@ const PRINTER_PRESETS={
     {id:'z-lube',name:'Mantenimiento eje Z',hours:300,description:'Lubricar husillo Z.',url:'https://wiki.bambulab.com/en/a1/maintenance'},
     {id:'hotend-clean',name:'Limpieza hotend',hours:200,description:'Limpieza de boquilla a 250°C.',url:'https://wiki.bambulab.com/en/a1/maintenance'},
   ]},
+  'bambu-h2s':{name:'Bambu Lab H2S',manualUrl:'https://wiki.bambulab.com/en/h2s/maintenance',tasks:[
+    {id:'xy-lube',name:'Lubricación ejes XY',hours:150,description:'Limpiar y lubricar guías lineales X e Y con aceite Bambu Lab.',url:'https://wiki.bambulab.com/en/h2s/maintenance'},
+    {id:'z-lube',name:'Mantenimiento eje Z',hours:300,description:'Lubricar husillo Z y rodamientos.',url:'https://wiki.bambulab.com/en/h2s/maintenance'},
+    {id:'hotend-clean',name:'Limpieza hotend y boquilla',hours:200,description:'Calentar a 250°C y limpiar boquilla y bloque calefactor.',url:'https://wiki.bambulab.com/en/h2s/maintenance'},
+    {id:'fans-clean',name:'Limpieza ventiladores',hours:400,description:'Limpiar ventiladores de pieza y fusor.',url:'https://wiki.bambulab.com/en/h2s/maintenance'},
+    {id:'calibration',name:'Calibración completa',hours:200,description:'Calibración completa tras mantenimiento mecánico.',url:'https://wiki.bambulab.com/en/h2s/maintenance'},
+  ]},
   'prusa-mk4':{name:'Prusa MK4',manualUrl:'https://help.prusa3d.com/es/guide/mantenimiento-regular_1790',tasks:[
-    {id:'pinda-clean',name:'Limpieza sonda y cama',hours:100,description:'Limpiar superficie cama y sonda PINDA.',url:'https://help.prusa3d.com/es/guide/mantenimiento-regular_1790'},
-    {id:'rods-lube',name:'Lubricación varillas',hours:200,description:'Lubricar varillas lisas X, Y y Z con grasa Prusa.',url:'https://help.prusa3d.com/es/guide/mantenimiento-regular_1790'},
-    {id:'hotend-clean',name:'Limpieza hotend',hours:200,description:'Limpieza de boquilla E3D y bloque calefactor.',url:'https://help.prusa3d.com/es/guide/mantenimiento-regular_1790'},
+    {id:'pinda-clean',name:'Limpieza sonda SuperPINDA y cama',hours:100,description:'Limpiar superficie PEI y sonda con alcohol isopropílico.',url:'https://help.prusa3d.com/es/guide/mantenimiento-regular_1790'},
+    {id:'rods-lube',name:'Lubricación varillas y husillo Z',hours:200,description:'Lubricar varillas lisas X/Y con grasa Prusa y husillo Z con aceite.',url:'https://help.prusa3d.com/es/guide/mantenimiento-regular_1790'},
+    {id:'hotend-clean',name:'Limpieza hotend E3D',hours:200,description:'Limpieza de boquilla y bloque calefactor. Revisar PTFE del hotend.',url:'https://help.prusa3d.com/es/guide/mantenimiento-regular_1790'},
+    {id:'belt-check',name:'Revisión tensión correas',hours:300,description:'Verificar y ajustar tensión de correas X e Y.',url:'https://help.prusa3d.com/es/guide/mantenimiento-regular_1790'},
+  ]},
+  'prusa-xl':{name:'Prusa XL',manualUrl:'https://help.prusa3d.com/es/',tasks:[
+    {id:'rods-lube',name:'Lubricación ejes',hours:200,description:'Lubricar varillas y husillos con grasa Prusa recomendada.',url:'https://help.prusa3d.com/es/'},
+    {id:'hotend-clean',name:'Limpieza toolhead',hours:150,description:'Limpieza de boquilla y zona calefactora de cada toolhead.',url:'https://help.prusa3d.com/es/'},
+    {id:'belt-check',name:'Revisión correas CoreXY',hours:300,description:'Verificar tensión de correas CoreXY.',url:'https://help.prusa3d.com/es/'},
+  ]},
+  'prusa-mini':{name:'Prusa MINI+',manualUrl:'https://help.prusa3d.com/es/',tasks:[
+    {id:'rods-lube',name:'Lubricación varillas',hours:150,description:'Lubricar varillas lisas con grasa Prusa.',url:'https://help.prusa3d.com/es/'},
+    {id:'hotend-clean',name:'Limpieza hotend',hours:200,description:'Limpieza de boquilla Bowden y bloque calefactor.',url:'https://help.prusa3d.com/es/'},
   ]},
   'creality-k1':{name:'Creality K1',manualUrl:'https://www.creality.com/pages/download-k1',tasks:[
-    {id:'xy-lube',name:'Lubricación ejes XY',hours:200,description:'Lubricar guías lineales X e Y.',url:'https://www.creality.com/pages/download-k1'},
-    {id:'hotend-clean',name:'Limpieza hotend',hours:150,description:'Limpieza de boquilla y zona calefactora.',url:'https://www.creality.com/pages/download-k1'},
+    {id:'xy-lube',name:'Lubricación guías lineales XY',hours:200,description:'Lubricar guías lineales X e Y con grasa recomendada.',url:'https://www.creality.com/pages/download-k1'},
+    {id:'hotend-clean',name:'Limpieza hotend',hours:150,description:'Limpieza de boquilla y bloque calefactor Spider.',url:'https://www.creality.com/pages/download-k1'},
+    {id:'fans-clean',name:'Limpieza ventiladores',hours:300,description:'Limpiar ventiladores de caja y del hotend.',url:'https://www.creality.com/pages/download-k1'},
+  ]},
+  'creality-k1max':{name:'Creality K1 Max',manualUrl:'https://www.creality.com/pages/download-k1-max',tasks:[
+    {id:'xy-lube',name:'Lubricación guías XY',hours:200,description:'Lubricar guías lineales X e Y.',url:'https://www.creality.com/pages/download-k1-max'},
+    {id:'hotend-clean',name:'Limpieza hotend',hours:150,description:'Limpieza de boquilla y bloque calefactor.',url:'https://www.creality.com/pages/download-k1-max'},
+    {id:'chamber-clean',name:'Limpieza cámara y filtro',hours:400,description:'Limpiar interior de cámara cerrada y filtro de carbono activo.',url:'https://www.creality.com/pages/download-k1-max'},
+  ]},
+  'creality-ender3v3':{name:'Creality Ender 3 V3',manualUrl:'https://www.creality.com/pages/download-ender-3-v3',tasks:[
+    {id:'rods-lube',name:'Lubricación varillas Z',hours:150,description:'Lubricar husillo Z y varillas lisas.',url:'https://www.creality.com/pages/download-ender-3-v3'},
+    {id:'belt-check',name:'Revisión correas XY',hours:200,description:'Verificar y ajustar tensión correas X e Y.',url:'https://www.creality.com/pages/download-ender-3-v3'},
+    {id:'hotend-clean',name:'Limpieza hotend Sprite',hours:200,description:'Limpieza de boquilla y bloque calefactor del extrusor Sprite.',url:'https://www.creality.com/pages/download-ender-3-v3'},
+  ]},
+  'voron-24':{name:'Voron 2.4',manualUrl:'https://docs.vorondesign.com/community/howto/xbst_/index.html',tasks:[
+    {id:'ab-lube',name:'Lubricación guías lineales AB',hours:200,description:'Lubricar guías lineales de los ejes A y B con grasa Mobil EP2 o similar.',url:'https://docs.vorondesign.com/'},
+    {id:'z-lube',name:'Lubricación husillos Z',hours:300,description:'Lubricar los 4 husillos Z con aceite lubricante.',url:'https://docs.vorondesign.com/'},
+    {id:'belt-check',name:'Revisión correas CoreXY',hours:200,description:'Verificar tensión de correas CoreXY A/B. Ajustar si es necesario.',url:'https://docs.vorondesign.com/'},
+    {id:'hotend-clean',name:'Limpieza hotend',hours:150,description:'Limpieza de boquilla y bloque calefactor Dragon/Rapido.',url:'https://docs.vorondesign.com/'},
+    {id:'idler-check',name:'Revisión poleas y tensores',hours:400,description:'Inspeccionar poleas idler, tensores y rodamientos.',url:'https://docs.vorondesign.com/'},
+  ]},
+  'ankermake-m5':{name:'AnkerMake M5',manualUrl:'https://support.ankermake.com/',tasks:[
+    {id:'xy-lube',name:'Lubricación guías XY',hours:200,description:'Lubricar guías lineales X e Y con aceite lubricante.',url:'https://support.ankermake.com/'},
+    {id:'hotend-clean',name:'Limpieza hotend',hours:150,description:'Limpieza de boquilla y zona calefactora.',url:'https://support.ankermake.com/'},
+    {id:'belt-check',name:'Revisión correas',hours:300,description:'Verificar tensión de correas y ajustar si es necesario.',url:'https://support.ankermake.com/'},
+  ]},
+  'flashforge-ad5m':{name:'Flashforge AD5M',manualUrl:'https://support.flashforge.com/',tasks:[
+    {id:'xy-lube',name:'Lubricación guías CoreXY',hours:200,description:'Lubricar guías lineales del sistema CoreXY.',url:'https://support.flashforge.com/'},
+    {id:'hotend-clean',name:'Limpieza hotend',hours:150,description:'Limpieza de boquilla y bloque calefactor.',url:'https://support.flashforge.com/'},
   ]},
 };
 
