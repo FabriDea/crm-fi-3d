@@ -1750,13 +1750,16 @@ function generatePDF(type, orderData){
     <div class="footer">${s.company||'Fabridea'} · ${s.web||''} · ${s.email||''} · Generado con CRM Fi 3D</div>
   </div></body></html>`;
 
+  return html;
+}
+
+function displayPDF(html){
   const win=window.open('','_blank');
   if(win){
     const closeBtn=`<div style="position:fixed;top:12px;right:12px;z-index:9999;display:flex;gap:8px;"><button onclick="window.close()" style="background:#1a1a2e;border:none;border-radius:100px;color:#fff;font-size:13px;padding:8px 16px;cursor:pointer;font-weight:700;box-shadow:0 2px 12px rgba(0,0,0,.4);">✕ Cerrar</button><button onclick="window.print()" style="background:#00e5a0;border:none;border-radius:100px;color:#0d0f14;font-size:13px;padding:8px 16px;cursor:pointer;font-weight:700;box-shadow:0 2px 12px rgba(0,0,0,.2);">🖨 Imprimir / PDF</button></div>`;
     win.document.write(html.replace('</body>',closeBtn+'</body>'));
     win.document.close();
   } else {
-    // iOS fallback: use iframe to preserve all CSS
     const old=document.getElementById('_pdf_overlay');if(old)old.remove();
     const overlay=document.createElement('div');
     overlay.id='_pdf_overlay';
@@ -1868,39 +1871,68 @@ function renderOrders(){
   if(orderMatFilter!=='all')orders=orders.filter(o=>o.filamentUsed&&o.filamentUsed.materialId===orderMatFilter);
   if(q)orders=orders.filter(o=>(o.pieceName+o.client+(o.code||'')+(o.notes||'')).toLowerCase().includes(q));
   if(!orders.length){$('orderTable').innerHTML=`<div class="empty"><div class="ei">📦</div><p>${orderFilter==='all'&&orderMatFilter==='all'&&!q?'Sin pedidos.<br>Ve a la <strong>Calculadora</strong> y guarda tu primer pedido.':'Sin pedidos con este filtro.'}</p></div>`;return;}
-  $('orderTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Pieza</th><th class="hide-mobile">Cliente</th><th class="hide-mobile">Fecha</th><th class="hide-mobile">Uds</th><th class="hide-mobile">Coste</th><th>Total</th><th class="hide-mobile">Margen</th><th>Estado</th><th></th></tr></thead><tbody>${orders.map(o=>{const s=STATUS_CFG[o.status]||{icon:'?',label:o.status,color:'var(--muted)'};const fileBtn=o.fileUrl?`<a href="${o.fileUrl}" target="_blank" class="btn btn-ghost btn-sm btn-icon" title="${o.fileName||'Archivo'}">📁</a>`:'';const qty=o.qty||1;const costTotal=(o.costPerPiece||0)*qty;const margin=(o.totalOrder||0)-costTotal;const marginColor=margin>0?'var(--accent)':(margin<0?'var(--red)':'var(--muted)');const fu=o.filamentUsed;const subBits=[];if(fu&&fu.gramsPerUnit)subBits.push(`🧵 ${fu.gramsPerUnit}g/ud`);if(o.printMinutes)subBits.push(`⏱ ${o.printMinutes}min`);const subline=subBits.length?`<div style="font-size:10px;color:var(--muted);margin-top:2px;">${subBits.join(' · ')}</div>`:'';return`<tr><td><span class="code-badge">${o.code||'—'}</span></td><td class="tdn">${o.pieceName}${subline}</td><td class="hide-mobile">${o.client||''}${o.apellidos?' '+o.apellidos:''}</td><td class="hide-mobile">${fmtDate(o.date)}</td><td class="hide-mobile">${qty}</td><td class="hide-mobile" style="color:var(--red);font-weight:600">${fmt(costTotal)}</td><td style="color:var(--a2);font-weight:600">${fmt(o.totalOrder||0)}</td><td class="hide-mobile" style="color:${marginColor};font-weight:600">${fmt(margin)}</td><td><select style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:${s.color};font-size:10px;padding:3px 5px;cursor:pointer;font-family:'DM Mono',monospace;max-width:120px;" onchange="changeOrderStatus('${o.id}',this)">${Object.entries(STATUS_CFG).map(([k,v])=>`<option value="${k}" ${o.status===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}</select></td><td style="display:flex;gap:3px;flex-wrap:wrap;">${fileBtn}<button class="btn btn-orange btn-sm btn-icon hide-mobile" onclick="genDocForOrder('${o.id}','budget')" title="Presupuesto">📄</button><button class="btn btn-blue btn-sm btn-icon hide-mobile" onclick="genDocForOrder('${o.id}','invoice')" title="Factura">🧾</button><button class="btn btn-ghost btn-sm btn-icon" onclick="showOrderDetail('${o.id}')" title="Detalles">ℹ️</button><button class="btn btn-ghost btn-sm btn-icon" onclick="openEditOrder('${o.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteOrder('${o.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;
+  $('orderTable').innerHTML=`<div class="tbl-wrap"><table><thead><tr><th>Código</th><th>Pieza</th><th class="hide-mobile">Cliente</th><th class="hide-mobile">Fecha</th><th class="hide-mobile">Uds</th><th class="hide-mobile">Coste</th><th>Total</th><th class="hide-mobile">Margen</th><th>Estado</th><th></th></tr></thead><tbody>${orders.map(o=>{const s=STATUS_CFG[o.status]||{icon:'?',label:o.status,color:'var(--muted)'};const fileBtn=o.fileUrl?`<a href="${o.fileUrl}" target="_blank" class="btn btn-ghost btn-sm btn-icon" title="${o.fileName||'Archivo'}">📁</a>`:'';const qty=o.qty||1;const costTotal=(o.costPerPiece||0)*qty;const margin=(o.totalOrder||0)-costTotal;const marginColor=margin>0?'var(--accent)':(margin<0?'var(--red)':'var(--muted)');const fu=o.filamentUsed;const subBits=[];if(fu&&fu.gramsPerUnit)subBits.push(`🧵 ${fu.gramsPerUnit}g/ud`);if(o.printMinutes)subBits.push(`⏱ ${o.printMinutes}min`);const subline=subBits.length?`<div style="font-size:10px;color:var(--muted);margin-top:2px;">${subBits.join(' · ')}</div>`:'';const invoiceBtn=o.invoiceHTML?`<button class="btn btn-blue btn-sm btn-icon hide-mobile" onclick="viewSavedInvoice('${o.id}')" title="Ver factura bloqueada">🔒</button>`:`<button class="btn btn-blue btn-sm btn-icon hide-mobile" onclick="genDocForOrder('${o.id}','invoice')" title="Factura">🧾</button>`;return`<tr><td><span class="code-badge">${o.code||'—'}</span></td><td class="tdn">${o.pieceName}${subline}</td><td class="hide-mobile">${o.client||''}${o.apellidos?' '+o.apellidos:''}</td><td class="hide-mobile">${fmtDate(o.date)}</td><td class="hide-mobile">${qty}</td><td class="hide-mobile" style="color:var(--red);font-weight:600">${fmt(costTotal)}</td><td style="color:var(--a2);font-weight:600">${fmt(o.totalOrder||0)}</td><td class="hide-mobile" style="color:${marginColor};font-weight:600">${fmt(margin)}</td><td><select style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:${s.color};font-size:10px;padding:3px 5px;cursor:pointer;font-family:'DM Mono',monospace;max-width:120px;" onchange="changeOrderStatus('${o.id}',this)">${Object.entries(STATUS_CFG).map(([k,v])=>`<option value="${k}" ${o.status===k?'selected':''}>${v.icon} ${v.label}</option>`).join('')}</select></td><td style="display:flex;gap:3px;flex-wrap:wrap;">${fileBtn}<button class="btn btn-orange btn-sm btn-icon hide-mobile" onclick="genDocForOrder('${o.id}','budget')" title="Presupuesto">📄</button>${invoiceBtn}<button class="btn btn-ghost btn-sm btn-icon" onclick="showOrderDetail('${o.id}')" title="Detalles">ℹ️</button><button class="btn btn-ghost btn-sm btn-icon" onclick="openEditOrder('${o.id}')">✏️</button><button class="btn btn-danger btn-sm btn-icon" onclick="deleteOrder('${o.id}')">🗑</button></td></tr>`;}).join('')}</tbody></table></div>`;
 }
 async function genDocForOrder(id,type){
-  // Get freshest copy from snapshot data
   let o=window._data.orders.find(x=>x.id===id);if(!o)return;
+
+  // INVOICE LOCK: if invoice already has saved HTML, just view it
+  if(type==='invoice'&&o.invoiceHTML){
+    const choice=await new Promise(resolve=>{
+      const old=document.getElementById('_invLockModal');if(old)old.remove();
+      const d=document.createElement('div');
+      d.id='_invLockModal';
+      d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);z-index:600;display:flex;align-items:center;justify-content:center;padding:16px;';
+      d.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;max-width:400px;width:100%;">
+        <div style="font-size:15px;font-weight:800;margin-bottom:8px;">🔒 Factura emitida</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">La factura <strong style="color:var(--a3);font-family:monospace">${o.invoiceNum}</strong> ya fue emitida el ${fmtDate(o.invoiceLockedAt||o.date)} y está bloqueada.</div>
+        <div style="font-size:11px;color:var(--muted);background:var(--s2);border-radius:8px;padding:10px;margin-bottom:16px;">⚖️ Las facturas emitidas no se pueden modificar (Reglamento de Facturación). Si hay un error, emite una factura rectificativa.</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button id="_iv_view" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;padding:10px;cursor:pointer;">👁 Ver factura ${o.invoiceNum}</button>
+          <button id="_iv_rect" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:10px;cursor:pointer;">📋 Emitir factura rectificativa</button>
+          <button id="_iv_cancel" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:8px;cursor:pointer;">Cancelar</button>
+        </div>
+      </div>`;
+      d.querySelector('#_iv_view').addEventListener('click',()=>{d.remove();resolve('view');});
+      d.querySelector('#_iv_rect').addEventListener('click',()=>{d.remove();resolve('rectify');});
+      d.querySelector('#_iv_cancel').addEventListener('click',()=>{d.remove();resolve(null);});
+      d.addEventListener('click',e=>{if(e.target===d){d.remove();resolve(null);}});
+      document.body.appendChild(d);
+    });
+    if(!choice)return;
+    if(choice==='view'){viewSavedInvoice(id);return;}
+    if(choice==='rectify'){
+      // Generate rectificative: new invoice number, inherits lines, marks original
+      const rectLines=(o.invoiceLines||o.budgetLines||buildDefaultLines(o,'invoice')).map(l=>({...l}));
+      const result=await showDocEditorModal('invoice',{...o,pieceName:`RECT. ${o.pieceName}`},null,rectLines);
+      if(!result)return;
+      o=window._data.orders.find(x=>x.id===id)||o;
+      const docNum=await getNextCode('invoice');
+      const upd={invoiceNum:docNum,invoiceLines:result.lines,invoiceHTML:null,invoiceLockedAt:null};
+      if(window.dbOps)await window.dbOps.updateOrder(id,upd);
+      Object.assign(o,upd);
+      await generatePDFWithLines('invoice',{...o},result.lines,docNum);
+      return;
+    }
+  }
 
   const existing=type==='budget'?o.budgetNum:o.invoiceNum;
   const label=type==='budget'?'presupuesto':'factura';
 
-  // Build starting lines: invoice always inherits from budget if available
   let startLines;
   if(type==='invoice'){
-    if(o.budgetLines&&o.budgetLines.length){
-      startLines=o.budgetLines.map(l=>({...l}));
-    } else if(o.invoiceLines&&o.invoiceLines.length){
-      startLines=o.invoiceLines.map(l=>({...l}));
-    } else {
-      startLines=buildDefaultLines(o,'invoice');
-    }
+    if(o.budgetLines&&o.budgetLines.length){startLines=o.budgetLines.map(l=>({...l}));}
+    else if(o.invoiceLines&&o.invoiceLines.length){startLines=o.invoiceLines.map(l=>({...l}));}
+    else{startLines=buildDefaultLines(o,'invoice');}
   } else {
-    if(o.budgetLines&&o.budgetLines.length){
-      startLines=o.budgetLines.map(l=>({...l}));
-    } else {
-      startLines=buildDefaultLines(o,'budget');
-    }
+    if(o.budgetLines&&o.budgetLines.length){startLines=o.budgetLines.map(l=>({...l}));}
+    else{startLines=buildDefaultLines(o,'budget');}
   }
 
   const result=await showDocEditorModal(type,o,existing,startLines);
   if(!result)return;
 
-  // Re-read order after modal closes (snapshot may have updated)
   o=window._data.orders.find(x=>x.id===id)||o;
-
   const {lines,action}=result;
   let docNum=existing;
   if(action==='new'||!existing){
@@ -1917,7 +1949,7 @@ async function genDocForOrder(id,type){
     Object.assign(o,{[lineField]:lines});
     docNum=existing;
   }
-  generatePDFWithLines(type,{...o},lines,docNum);
+  await generatePDFWithLines(type,{...o},lines,docNum);
 }
 
 function buildDefaultLines(order,type){
@@ -1969,10 +2001,23 @@ function showDocEditorModal(type,order,existing,lines){
 }
 
 
-function generatePDFWithLines(type,order,lines,docNum){
-  // Use lines for the PDF instead of the default single-line
+async function generatePDFWithLines(type,order,lines,docNum){
   const overrideOrder={...order,_customLines:lines,_docNum:docNum};
-  generatePDF(type,overrideOrder);
+  const html=generatePDF(type,overrideOrder);
+  // Save invoice HTML to Firestore for permanent storage (invoices are immutable)
+  if(type==='invoice'&&order.id&&window.dbOps){
+    await window.dbOps.updateOrder(order.id,{invoiceHTML:html,invoiceLockedAt:today()});
+    // Update local copy
+    const lo=window._data.orders.find(x=>x.id===order.id);
+    if(lo){lo.invoiceHTML=html;lo.invoiceLockedAt=today();}
+    toast('🔒 Factura emitida y bloqueada','green');
+  }
+  displayPDF(html);
+}
+function viewSavedInvoice(id){
+  const o=window._data.orders.find(x=>x.id===id);
+  if(!o||!o.invoiceHTML){toast('Factura no encontrada','red');return;}
+  displayPDF(o.invoiceHTML);
 }
 function openEditOrder(id){const o=window._data.orders.find(x=>x.id===id);if(!o)return;$('eo-id').value=id;$('eo-code-display').textContent=o.code||'';$('eo-piece').value=o.pieceName||'';$('eo-status').value=o.status||'solicitud';$('eo-client').value=o.client||'';$('eo-apellidos').value=o.apellidos||'';$('eo-phone').value=o.phone||'';$('eo-email').value=o.email||'';$('eo-qty').value=o.qty||1;$('eo-date').value=o.date||today();$('eo-cost').value=o.costPerPiece||0;$('eo-price').value=o.pricePerPiece||0;$('eo-budget').value=o.budgetNum||'';$('eo-invoice').value=o.invoiceNum||'';$('eo-notes').value=o.notes||'';$('eo-grams').value='';
   // Mostrar archivo actual si existe
@@ -2062,7 +2107,7 @@ function showOrderDetail(id){
     <div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:13px;font-weight:700;margin-top:4px;"><span>Coste/unidad</span><span style="color:var(--red)">${fmt(o.costPerPiece||0)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;font-weight:700;"><span>Precio venta/unidad</span><span style="color:var(--a2)">${fmt(o.pricePerPiece||0)}</span></div>
     ${o.stockDeducted?'<div style="font-size:11px;color:var(--accent);margin-top:10px;">✓ Stock de filamento descontado</div>':'<div style="font-size:11px;color:var(--muted);margin-top:10px;">Stock no descontado aún (pendiente de entrar en producción)</div>'}
-    ${(o.budgetNum||o.invoiceNum)?`<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;display:flex;gap:8px;flex-wrap:wrap;">${o.budgetNum?`<button class="btn btn-orange btn-sm" onclick="closeModal('orderDetailModal');genDocForOrder('${o.id}','budget')">📄 ${o.budgetNum}</button>`:''} ${o.invoiceNum?`<button class="btn btn-blue btn-sm" onclick="closeModal('orderDetailModal');genDocForOrder('${o.id}','invoice')">🧾 ${o.invoiceNum}</button>`:''}</div>`:''}
+    ${(o.budgetNum||o.invoiceNum)?`<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;display:flex;gap:8px;flex-wrap:wrap;">${o.budgetNum?`<button class="btn btn-orange btn-sm" onclick="closeModal('orderDetailModal');genDocForOrder('${o.id}','budget')">📄 ${o.budgetNum}</button>`:''} ${o.invoiceNum?`<button class="btn btn-blue btn-sm" onclick="closeModal('orderDetailModal');${o.invoiceHTML?`viewSavedInvoice('${o.id}')`:`genDocForOrder('${o.id}','invoice')`}">${o.invoiceHTML?'🔒':'🧾'} ${o.invoiceNum}</button>`:''}</div>`:''}
   `;
   $('orderDetailModal').classList.add('open');
 }
@@ -2428,7 +2473,7 @@ function renderDocsTab(type){
     <td class="tdn">${o.pieceName}</td>
     <td>${o.client||''} ${o.apellidos||''}</td>
     <td style="color:var(--a2);font-weight:600">${fmt(o.totalOrder||0)}</td>
-    <td><button class="btn btn-ghost btn-sm btn-icon" onclick="genDocForOrder('${o.id}','${type==='budget'?'budget':'invoice'}')" title="Ver/Descargar">${icon}</button></td>
+    <td><button class="btn btn-ghost btn-sm btn-icon" onclick="${type==='invoice'&&o.invoiceHTML?`viewSavedInvoice('${o.id}')`:`genDocForOrder('${o.id}','${type==='budget'?'budget':'invoice'}')`}" title="${type==='invoice'&&o.invoiceHTML?'Ver factura (bloqueada)':'Ver/Descargar'}">${type==='invoice'&&o.invoiceHTML?'🔒':icon}</button></td>
   </tr>`).join('')}
   </tbody></table></div>`;
 }
