@@ -585,7 +585,7 @@ tr:hover td{background:var(--s2);}
   <div class="ph">
     <div><div class="ph-title">Pedidos</div><div class="ph-sub">Registro y seguimiento completo</div></div>
     <div class="ph-actions">
-      <button class="btn btn-ghost btn-sm" onclick="setOrdersTab('catalog',this)" id="tab-catalog-btn">📚 Catálogo</button>
+      <button class="btn btn-ghost btn-sm" onclick="setOrdersTab(this.dataset.tab==='catalog'?'orders':'catalog',this)" data-tab="orders" id="tab-catalog-btn">📚 Catálogo</button>
       <button class="btn btn-excel btn-sm" onclick="exportOrdersXL()">📊 Excel</button>
     </div>
   </div>
@@ -1751,8 +1751,19 @@ function generatePDF(type, orderData){
   </div></body></html>`;
 
   const win=window.open('','_blank');
-  if(win){win.document.write(html);win.document.close();setTimeout(()=>win.print(),600);}
-  else toast('Activa ventanas emergentes en el navegador','red');
+  if(win){
+    const closeBtn=`<div style="position:fixed;top:12px;right:12px;z-index:9999;"><button onclick="window.close()" style="background:#1a1a2e;border:none;border-radius:100px;color:#fff;font-size:13px;padding:8px 16px;cursor:pointer;font-weight:700;box-shadow:0 2px 12px rgba(0,0,0,.4);">✕ Cerrar</button><button onclick="window.print()" style="background:#00e5a0;border:none;border-radius:100px;color:#0d0f14;font-size:13px;padding:8px 16px;cursor:pointer;font-weight:700;margin-left:8px;box-shadow:0 2px 12px rgba(0,0,0,.2);">🖨 Imprimir</button></div>`;
+    win.document.write(html.replace('</body>',closeBtn+'</body>'));
+    win.document.close();
+  } else {
+    // Fallback for iOS Safari popup blocker — show in overlay
+    const overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;z-index:9000;background:#fff;overflow-y:auto;-webkit-overflow-scrolling:touch;';
+    overlay.innerHTML=`<div style="position:sticky;top:0;background:rgba(255,255,255,.95);backdrop-filter:blur(8px);padding:10px 16px;display:flex;gap:8px;border-bottom:1px solid #e5e7eb;z-index:1;"><button onclick="document.getElementById('_pdf_overlay').remove()" style="background:#1a1a2e;border:none;border-radius:100px;color:#fff;font-size:13px;padding:8px 16px;cursor:pointer;font-weight:700;">✕ Cerrar</button><button onclick="window.print()" style="background:#00e5a0;border:none;border-radius:100px;color:#0d0f14;font-size:13px;padding:8px 16px;cursor:pointer;font-weight:700;">🖨 Imprimir / Guardar PDF</button></div><div style="padding:20px;">${html.replace(/<html[^>]*>|<\/html>|<head>[\s\S]*?<\/head>|<body[^>]*>|<\/body>/gi,'')}</div>`;
+    overlay.id='_pdf_overlay';
+    document.body.appendChild(overlay);
+    toast('Activa ventanas emergentes para mejor experiencia, o usa el botón Imprimir','green');
+  }
 }
 
 /* ════ SAVE ORDER ════ */
@@ -1904,78 +1915,36 @@ function showDocEditorModal(type,order,existing,lines){
     const nextNum=type==='budget'?(parseInt(s.nextBudget)||1):(parseInt(s.nextInvoice)||1);
     const nextPrefix=type==='budget'?(s.prefixBudget||'PRES-'):(s.prefixInvoice||'FAC-');
     const nextCode=nextPrefix+String(nextNum).padStart(5,'0');
-    let currentLines=[...lines.map(l=>({...l}))];
-
+    window._docLines=lines.map(l=>({...l}));
     const old=document.getElementById('_docEditorModal');if(old)old.remove();
     const div=document.createElement('div');
     div.id='_docEditorModal';
-    div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(4px);z-index:600;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;';
-
-    function renderLines(){
-      const tbody=div.querySelector('#_doc_lines');if(!tbody)return;
-      tbody.innerHTML=currentLines.map((l,i)=>`<tr>
-        <td><input value="${l.desc||''}" placeholder="Concepto" onchange="window._docLines[${i}].desc=this.value" style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;width:100%;"></td>
-        <td><input type="number" value="${l.qty||1}" min="1" step="1" onchange="window._docLines[${i}].qty=parseFloat(this.value)||1;updateDocTotal()" style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;width:60px;text-align:center;"></td>
-        <td><input type="number" value="${(l.price||0).toFixed(2)}" min="0" step="0.01" onchange="window._docLines[${i}].price=parseFloat(this.value)||0;updateDocTotal()" style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;width:80px;text-align:right;"></td>
-        <td style="text-align:right;font-weight:600;font-size:12px;color:var(--a2);min-width:70px;">${fmt((l.qty||1)*(l.price||0))}</td>
-        <td><button onclick="window._docLines.splice(${i},1);window._rerenderDocLines();updateDocTotal()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">🗑</button></td>
-      </tr>`).join('');
-      updateDocTotal();
+    div.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(4px);z-index:600;display:flex;align-items:flex-start;justify-content:center;padding:12px;overflow-y:auto;-webkit-overflow-scrolling:touch;';
+    function calcSub(){return window._docLines.reduce((a,l)=>a+(parseFloat(l.qty)||1)*(parseFloat(l.price)||0),0);}
+    function updateTotal(){
+      const sub=calcSub();const iva=sub*(parseFloat(s.taxIVA)||21)/100;
+      const el=document.getElementById('_doc_total_box');
+      if(el)el.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;color:var(--soft)"><span>Subtotal</span><span>${fmt(sub)}</span></div><div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;color:var(--soft)"><span>IVA ${s.taxIVA||21}%</span><span>${fmt(iva)}</span></div><div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;padding:8px 0 0;border-top:2px solid var(--border);margin-top:4px;"><span>TOTAL</span><span style="color:var(--a2)">${fmt(sub+iva)}</span></div>`;
     }
-
-    window._docLines=currentLines;
-    window._rerenderDocLines=renderLines;
-    window.updateDocTotal=function(){
-      const total=window._docLines.reduce((a,l)=>a+(l.qty||1)*(l.price||0),0);
-      const iva=(total*(s.taxIVA||21)/100);
-      const el=div.querySelector('#_doc_total');
-      if(el)el.innerHTML=`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;"><span style="color:var(--muted)">Subtotal</span><span>${fmt(total)}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;"><span style="color:var(--muted)">IVA ${s.taxIVA||21}%</span><span>${fmt(iva)}</span></div><div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;padding:6px 0 0;border-top:1px solid var(--border);margin-top:4px;"><span>TOTAL</span><span style="color:var(--a2)">${fmt(total+iva)}</span></div>`;
-    };
-
-    div.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:560px;width:100%;margin-top:20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;">${icon} Editar ${label}</div>
-        <button onclick="document.getElementById('_docEditorModal').remove();resolve(null);" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;">✕</button>
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">
-        ${order.pieceName} · ${order.client||''} ${order.apellidos||''}
-        ${existing?`· <span style="color:var(--a3)">${existing}</span>`:''}
-      </div>
-      <div style="overflow-x:auto;margin-bottom:10px;">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;">
-          <thead><tr style="border-bottom:1px solid var(--border);">
-            <th style="text-align:left;padding:6px 4px;color:var(--muted);font-size:10px;letter-spacing:1px;">CONCEPTO</th>
-            <th style="text-align:center;padding:6px 4px;color:var(--muted);font-size:10px;">UDS</th>
-            <th style="text-align:right;padding:6px 4px;color:var(--muted);font-size:10px;">PRECIO/U</th>
-            <th style="text-align:right;padding:6px 4px;color:var(--muted);font-size:10px;">TOTAL</th>
-            <th></th>
-          </tr></thead>
-          <tbody id="_doc_lines"></tbody>
-        </table>
-      </div>
-      <button onclick="window._docLines.push({desc:'',qty:1,price:0});window._rerenderDocLines();" style="background:var(--s2);border:1px dashed var(--border);border-radius:8px;color:var(--muted);font-size:11px;padding:7px 14px;cursor:pointer;width:100%;margin-bottom:12px;">＋ Añadir línea</button>
-      <div id="_doc_total" style="background:var(--s2);border-radius:8px;padding:10px 14px;margin-bottom:14px;"></div>
-      <div style="background:rgba(255,107,53,.07);border:1px solid rgba(255,107,53,.15);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--muted);">
-        ${existing?`Este pedido ya tiene el número <strong style="color:var(--a3)">${existing}</strong>.`:`Se asignará el número <strong style="color:var(--a3)">${nextCode}</strong>.`}
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button onclick="document.getElementById('_docEditorModal').remove();" style="flex:1;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:11px;padding:10px;cursor:pointer;">Cancelar</button>
-        ${existing?`<button id="_btn_reprint" style="flex:2;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:11px;padding:10px;cursor:pointer;">🖨 Reimprimir ${existing}</button>`:''}
-        <button id="_btn_emit" style="flex:2;background:linear-gradient(135deg,#ea6c00,#ff6b35);border:none;border-radius:8px;color:#fff;font-size:11px;font-weight:700;padding:10px;cursor:pointer;">${icon} ${existing?'Emitir nueva '+nextCode:'Confirmar y emitir '+nextCode}</button>
-      </div>
-    </div>`;
-
-    // Bind close button resolve
-    div.querySelector('button[onclick*="resolve"]')?.addEventListener('click',()=>{div.remove();resolve(null);});
-    const reprintBtn=div.querySelector('#_btn_reprint');
-    if(reprintBtn)reprintBtn.addEventListener('click',()=>{currentLines=[...window._docLines];div.remove();resolve({lines:currentLines,action:'reprint'});});
-    div.querySelector('#_btn_emit').addEventListener('click',()=>{currentLines=[...window._docLines];div.remove();resolve({lines:currentLines,action:existing?'new':'confirm'});});
+    function renderLines(){
+      const c=document.getElementById('_doc_lines_container');if(!c)return;
+      c.innerHTML=window._docLines.map((l,i)=>`<div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><span style="font-size:10px;font-weight:700;color:var(--muted);">LÍNEA ${i+1}</span><button onclick="window._docLines.splice(${i},1);window._rerender();" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:18px;">🗑</button></div><div style="margin-bottom:8px;"><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px;">CONCEPTO</label><input value="${(l.desc||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}" placeholder="Descripción…" oninput="window._docLines[${i}].desc=this.value" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:8px 10px;box-sizing:border-box;"></div><div style="display:grid;grid-template-columns:70px 1fr 70px;gap:8px;align-items:end;"><div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px;">UDS</label><input type="number" value="${parseFloat(l.qty)||1}" min="1" step="1" oninput="window._docLines[${i}].qty=parseFloat(this.value)||1;window._updateTotal();" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:8px;text-align:center;"></div><div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px;">PRECIO/U (€)</label><input type="number" value="${(parseFloat(l.price)||0).toFixed(2)}" min="0" step="0.01" oninput="window._docLines[${i}].price=parseFloat(this.value)||0;window._updateTotal();" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:8px;"></div><div style="text-align:right;padding-bottom:6px;font-size:13px;font-weight:700;color:var(--a2)" id="_lt_${i}">${fmt((parseFloat(l.qty)||1)*(parseFloat(l.price)||0))}</div></div></div>`).join('');
+      updateTotal();
+    }
+    window._rerender=renderLines;
+    window._updateTotal=function(){window._docLines.forEach((l,i)=>{const el=document.getElementById(`_lt_${i}`);if(el)el.textContent=fmt((parseFloat(l.qty)||1)*(parseFloat(l.price)||0));});updateTotal();};
+    div.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;max-width:500px;width:100%;margin-top:16px;margin-bottom:16px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><div style="font-size:15px;font-weight:800;">${icon} Editar ${label}</div><button id="_btn_close_editor" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px;line-height:1;">✕</button></div><div style="font-size:11px;color:var(--muted);margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);"><strong style="color:var(--text)">${order.pieceName}</strong> · ${order.client||''} ${order.apellidos||''}${existing?` · <span style="color:var(--a3);font-family:monospace">${existing}</span>`:''}</div><div id="_doc_lines_container"></div><button id="_btn_add_line" style="width:100%;background:transparent;border:1px dashed var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:10px;cursor:pointer;margin-bottom:14px;">＋ Añadir línea</button><div id="_doc_total_box" style="background:var(--s2);border-radius:8px;padding:12px 14px;margin-bottom:14px;"></div><div style="background:rgba(255,107,53,.07);border:1px solid rgba(255,107,53,.15);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--muted);">${existing?`Este pedido ya tiene el número <strong style="color:var(--a3);font-family:monospace">${existing}</strong>.`:`Se asignará el número <strong style="color:var(--a3);font-family:monospace">${nextCode}</strong>.`}</div><div style="display:grid;grid-template-columns:${existing?'1fr 1fr 1.5fr':'1fr 2fr'};gap:8px;""><button id="_btn_cancel" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;padding:10px;cursor:pointer;">Cancelar</button>${existing?`<button id="_btn_reprint" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:10px;cursor:pointer;">🖨 ${existing}</button>`:''}<button id="_btn_emit" style="background:linear-gradient(135deg,#ea6c00,#ff6b35);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;padding:10px;cursor:pointer;">${icon} ${existing?'Nueva '+nextCode:'Emitir '+nextCode}</button></div></div>`;
+    div.querySelector('#_btn_close_editor').addEventListener('click',()=>{div.remove();resolve(null);});
+    div.querySelector('#_btn_cancel').addEventListener('click',()=>{div.remove();resolve(null);});
+    div.querySelector('#_btn_add_line').addEventListener('click',()=>{window._docLines.push({desc:'',qty:1,price:0});renderLines();});
+    const rb=div.querySelector('#_btn_reprint');if(rb)rb.addEventListener('click',()=>{const l=[...window._docLines];div.remove();resolve({lines:l,action:'reprint'});});
+    div.querySelector('#_btn_emit').addEventListener('click',()=>{const l=[...window._docLines];div.remove();resolve({lines:l,action:existing?'new':'confirm'});});
     div.addEventListener('click',e=>{if(e.target===div){div.remove();resolve(null);}});
-
     document.body.appendChild(div);
     renderLines();
   });
 }
+
 
 function generatePDFWithLines(type,order,lines,docNum){
   // Use lines for the PDF instead of the default single-line
@@ -2070,6 +2039,7 @@ function showOrderDetail(id){
     <div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:13px;font-weight:700;margin-top:4px;"><span>Coste/unidad</span><span style="color:var(--red)">${fmt(o.costPerPiece||0)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;font-weight:700;"><span>Precio venta/unidad</span><span style="color:var(--a2)">${fmt(o.pricePerPiece||0)}</span></div>
     ${o.stockDeducted?'<div style="font-size:11px;color:var(--accent);margin-top:10px;">✓ Stock de filamento descontado</div>':'<div style="font-size:11px;color:var(--muted);margin-top:10px;">Stock no descontado aún (pendiente de entrar en producción)</div>'}
+    ${(o.budgetNum||o.invoiceNum)?`<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;display:flex;gap:8px;flex-wrap:wrap;">${o.budgetNum?`<button class="btn btn-orange btn-sm" onclick="closeModal('orderDetailModal');genDocForOrder('${o.id}','budget')">📄 ${o.budgetNum}</button>`:''} ${o.invoiceNum?`<button class="btn btn-blue btn-sm" onclick="closeModal('orderDetailModal');genDocForOrder('${o.id}','invoice')">🧾 ${o.invoiceNum}</button>`:''}</div>`:''}
   `;
   $('orderDetailModal').classList.add('open');
 }
@@ -2453,7 +2423,10 @@ function setOrdersTab(tab,btn){
   $('orders-tab-orders').style.display=tab==='orders'?'':'none';
   $('orders-tab-catalog').style.display=tab==='catalog'?'':'none';
   const tabBtn=$('tab-catalog-btn');
-  if(tabBtn){tabBtn.textContent=tab==='catalog'?'← Pedidos':'📚 Catálogo';}
+  if(tabBtn){
+    tabBtn.textContent=tab==='catalog'?'← Pedidos':'📚 Catálogo';
+    tabBtn.dataset.tab=tab;
+  }
   if(tab==='catalog')renderCatalog();
 }
 function renderCatalog(){
