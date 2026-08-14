@@ -393,7 +393,7 @@ tr:hover td{background:var(--s2);}
 <div class="page active" id="page-dashboard">
   <div class="ph">
     <div><div class="ph-title">Dashboard</div><div class="ph-sub">Resumen en tiempo real · CRM Fi 3D</div></div>
-    <button class="btn btn-primary" onclick="go('calc')">＋ Nuevo pedido</button>
+    <button class="btn btn-primary" onclick="newOrderFromPedidos()">＋ Nuevo pedido</button>
   </div>
   <div class="g4" style="margin-bottom:12px">
     <div class="stat"><div class="sv2" id="d-orders" style="color:var(--accent)">0</div><div class="sl">Pedidos</div></div>
@@ -577,6 +577,7 @@ tr:hover td{background:var(--s2);}
   <div class="ph">
     <div><div class="ph-title">Pedidos</div><div class="ph-sub">Registro y seguimiento completo</div></div>
     <div class="ph-actions">
+      <button class="btn btn-primary btn-sm" onclick="newOrderFromPedidos()">＋ Nuevo pedido</button>
       <button class="btn btn-ghost btn-sm" onclick="setOrdersTab(this.dataset.tab==='catalog'?'orders':'catalog',this)" data-tab="orders" id="tab-catalog-btn">📚 Catálogo</button>
       <button class="btn btn-excel btn-sm" onclick="exportOrdersXL()">📊 Excel</button>
     </div>
@@ -1728,7 +1729,29 @@ function getCCVal(id){
 function addCC(){const id=++ccId;ccList.push({id});const w=document.createElement('div');w.className='cci';w.id=`cc-${id}`;w.innerHTML=`<div class="cchd"><input class="ccni" type="text" id="cc-n-${id}" placeholder="Ej: IA diseño…" oninput="calc()"><button style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);width:27px;height:27px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;" onclick="removeCC(${id})">×</button></div><div class="cmt"><button class="cmb active" data-mode="direct" onclick="swCC(${id},'direct')">💰 Por pieza</button><button class="cmb" data-mode="amort" onclick="swCC(${id},'amort')">📊 Repartir</button></div><div class="cpp vis" id="cc-pd-${id}"><div class="iw"><input type="number" id="cc-d-${id}" value="0" min="0" step=".01" class="hu" oninput="calc()"><span class="unit">€</span></div><div class="ccomp" id="cc-comp-${id}"></div></div><div class="cpp" id="cc-pa-${id}"><div class="cag"><div><label style="margin-bottom:3px">Total pagado</label><div class="iw"><input type="number" id="cc-t-${id}" value="0" min="0" step=".01" class="hu" oninput="calc()"><span class="unit">€</span></div></div><div><label style="margin-bottom:3px">Nº piezas</label><div class="iw"><input type="number" id="cc-q-${id}" value="10" min="1" step="1" class="hu" oninput="calc()"><span class="unit">uds</span></div></div></div><div class="car"><span>Por pieza:</span><span id="cc-ar-val-${id}">—</span></div></div>`;$('customCosts').appendChild(w);calc();$(`cc-n-${id}`).focus();}
 function swCC(id,mode){document.querySelectorAll(`#cc-${id} .cmb`).forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));$(`cc-pd-${id}`).classList.toggle('vis',mode==='direct');$(`cc-pa-${id}`).classList.toggle('vis',mode==='amort');calc();}
 function removeCC(id){ccList=ccList.filter(c=>c.id!==id);const el=$(`cc-${id}`);if(el){el.style.cssText='opacity:0;transform:translateY(-5px);transition:.18s';setTimeout(()=>el.remove(),200);}calc();}
-function resetCalc(){const d={filamentWeight:0,spoolPrice:22,spoolWeight:1000,printHours:180,printerWatts:200,kwhPrice:.18,printerCost:1200,printerLife:5000,maintenance:80,laborRate:15,laborHours:30,postHours:0,packCost:1.5,shipCost:4};Object.entries(d).forEach(([k,v])=>{if($(k))$(k).value=v;});$('failureRate').value=5;$('fRV').textContent='5%';$('platformFee').value=6.5;$('pfV').textContent='6.5%';$('margin').value=100;$('mgV').textContent='100%';ccList=[];$('customCosts').innerHTML='';colorLines=[];_clIdSeq=0;addColorLine();}
+function newOrderFromPedidos(){
+  resetCalc();
+  applySettingsToCalc();
+  go('calc');
+  setTimeout(()=>document.getElementById('page-calc')?.scrollTo(0,0),100);
+}
+function resetCalc(){
+  const d={filamentWeight:0,spoolPrice:22,spoolWeight:1000,printHours:180,printerWatts:200,kwhPrice:.18,printerCost:1200,printerLife:5000,maintenance:80,laborRate:15,laborHours:30,postHours:0,packCost:1.5,shipCost:4};
+  Object.entries(d).forEach(([k,v])=>{if($(k))$(k).value=v;});
+  if($('failureRate')){$('failureRate').value=5;$('fRV').textContent='5%';}
+  if($('platformFee')){$('platformFee').value=6.5;$('pfV').textContent='6.5%';}
+  if($('margin')){$('margin').value=100;$('mgV').textContent='100%';}
+  if($('pieceName')){$('pieceName').value='';$('pieceName').style.borderColor='';}
+  if($('m-salePrice'))$('m-salePrice').value='';
+  if($('m-forMe'))$('m-forMe').checked=false;
+  ccList=[];if($('customCosts'))$('customCosts').innerHTML='';
+  colorLines=[];_clIdSeq=0;
+  // Reset to Rápida mode
+  currentCalcMode='rapida';
+  document.querySelectorAll('.calc-tab').forEach(t=>t.classList.toggle('active',t.textContent.includes('RÁPIDA')||t.textContent.includes('Rápida')));
+  if(typeof applyCalcSettings==='function')applyCalcSettings();
+  addColorLine();
+}
 
 /* ════ PDF — SOLO IVA AL CLIENTE ════ */
 function generatePDF(type, orderData){
