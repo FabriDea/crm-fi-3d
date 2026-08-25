@@ -126,6 +126,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg) var(--body-bg-image);ba
 .sl{font-size:11px;color:var(--muted);letter-spacing:.3px;font-weight:500;}
 @media(min-width:900px){.sl{font-size:12px;}}
 
+/* CARD TINTS — soft color wash to differentiate blocks at a glance */
+.card-tint-mint{background:linear-gradient(160deg,rgba(0,229,160,.11),rgba(0,229,160,.02));border-color:rgba(0,229,160,.2);}
+.card-tint-violet{background:linear-gradient(160deg,rgba(139,125,255,.11),rgba(139,125,255,.02));border-color:rgba(139,125,255,.2);}
+.card-tint-amber{background:linear-gradient(160deg,rgba(242,169,34,.13),rgba(242,169,34,.02));border-color:rgba(242,169,34,.22);}
+.card-tint-coral{background:linear-gradient(160deg,rgba(255,122,82,.11),rgba(255,122,82,.02));border-color:rgba(255,122,82,.2);}
+.card-tint-blue{background:linear-gradient(160deg,rgba(91,155,247,.11),rgba(91,155,247,.02));border-color:rgba(91,155,247,.2);}
+
 /* FORMS */
 .field{margin-bottom:12px;}.field:last-child{margin-bottom:0;}
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
@@ -438,7 +445,7 @@ tr:hover td{background:var(--s2);}
     <div class="stat"><div class="stat-icon ic-a2">💶</div><div class="sv2" id="d-revenue" style="color:var(--a2)">0€</div><div class="sl">Facturación</div></div>
     <div class="stat"><div class="stat-icon ic-yellow">📈</div><div class="sv2" id="d-profit" style="color:var(--yellow)">0€</div><div class="sl">Beneficio</div></div>
   </div>
-  <div class="card" style="margin-bottom:12px;" id="d-fiscal-health-card"><div class="ct"><span class="dot"></span>🩺 Salud fiscal</div><div id="d-fiscal-health"></div></div>
+  <div class="card card-tint-mint" style="margin-bottom:12px;" id="d-fiscal-health-card"><div class="ct"><span class="dot"></span>🩺 Salud fiscal</div><div id="d-fiscal-health"></div></div>
   <div class="g2" style="margin-bottom:12px">
     <div class="card"><div class="ct"><span class="dot"></span>Estado de pedidos</div><div id="d-status-bars"></div></div>
     <div class="card"><div class="ct"><span class="dot"></span>Últimos pedidos</div><div id="d-recent"></div></div>
@@ -452,8 +459,8 @@ tr:hover td{background:var(--s2);}
     <div class="card"><div class="ct"><span class="dot"></span>📅 Esta semana</div><div id="d-week-stats"></div></div>
   </div>
   <div class="g2">
-    <div class="card"><div class="ct"><span class="dot"></span>Resumen financiero</div><div id="d-finsummary"></div></div>
-    <div class="card"><div class="ct"><span class="dot"></span>🧾 Cobros pendientes</div><div id="d-payments"></div></div>
+    <div class="card card-tint-violet"><div class="ct"><span class="dot"></span>Resumen financiero</div><div id="d-finsummary"></div></div>
+    <div class="card card-tint-amber"><div class="ct"><span class="dot"></span>🧾 Cobros pendientes</div><div id="d-payments"></div></div>
   </div>
 </div>
 
@@ -2462,6 +2469,17 @@ function renderOrders(){
 }
 const KANBAN_STATUSES=['solicitud','info','diseno','aprobacion','aprobado','cola','impresion','postproceso','calidad','listo','enviado','entregado','facturado','incidencia'];
 function renderOrdersKanban(orders){
+  const totalCount=orders.length;
+  const prodCount=orders.filter(o=>PRODUCTION_STATUSES.includes(o.status)).length;
+  const ym=today().slice(0,7);
+  const doneMonthCount=orders.filter(o=>(o.status==='entregado'||o.status==='facturado')&&(o.date||'').slice(0,7)===ym).length;
+  const totalValue=orders.reduce((a,o)=>a+(o.totalOrder||0),0);
+  const statsRow=`<div class="g4" style="margin-bottom:12px;">
+    <div class="stat"><div class="stat-icon ic-accent">📦</div><div class="sv2" style="color:var(--accent)">${totalCount}</div><div class="sl">Pedidos en tablero</div></div>
+    <div class="stat"><div class="stat-icon ic-a3">🖨</div><div class="sv2" style="color:var(--a3)">${prodCount}</div><div class="sl">En producción</div></div>
+    <div class="stat"><div class="stat-icon ic-yellow">✅</div><div class="sv2" style="color:var(--yellow)">${doneMonthCount}</div><div class="sl">Completados este mes</div></div>
+    <div class="stat"><div class="stat-icon ic-a2">💶</div><div class="sv2" style="color:var(--a2)">${fmt(totalValue)}</div><div class="sl">Valor en tablero</div></div>
+  </div>`;
   const cols=KANBAN_STATUSES.map(key=>{
     const cfg=STATUS_CFG[key]||{icon:'?',label:key,color:'var(--muted)'};
     const colOrders=orders.filter(o=>o.status===key);
@@ -2485,7 +2503,7 @@ function renderOrdersKanban(orders){
       </div>
     </div>`;
   }).join('');
-  $('orderKanban').innerHTML=`<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;">${cols}</div>`;
+  $('orderKanban').innerHTML=statsRow+`<div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;">${cols}</div>`;
 }
 async function genDocForOrder(id,type){
   let o=window._data.orders.find(x=>x.id===id);if(!o)return;
