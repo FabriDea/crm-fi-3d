@@ -600,8 +600,15 @@ tr:hover td{background:var(--s2);}
         </div>
         <div style="margin-top:10px;">
           <label>Margen de beneficio</label>
-          <div class="sw" style="margin-top:5px;"><input type="range" id="margin" min="10" max="500" value="100" step="5" oninput="document.getElementById('mgV').textContent=this.value+'%';calc()"><span class="sv" id="mgV">100%</span></div>
+          <div class="sw" style="margin-top:5px;"><input type="range" id="margin" min="10" max="500" value="100" step="5" oninput="onMarginSlide(this)"><span class="sv" id="mgV">100%</span></div>
         </div>
+        <div class="fr" style="margin-top:10px;margin-bottom:0;align-items:flex-end;">
+          <div class="field" style="margin-bottom:0;">
+            <label>Fijar precio de venta/u (€)</label>
+            <div class="iw"><input type="number" id="manualPrice" min="0" step=".01" placeholder="Automático (según margen)" class="hu" oninput="onManualPriceInput()"><span class="unit">€</span></div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm btn-full" style="margin-top:8px;" onclick="togglePieceForMe()" id="btnForMe">🎁 Es para mí (sin beneficio, venta 0€)</button>
         <div class="rpb">
           <div class="rpl">💶 Precio venta (sin impuestos)</div>
           <div class="rpv" id="r-price">—</div>
@@ -2089,6 +2096,31 @@ function populateFilamentInventory(){
 
 function handleFilamentChange(){calc();}
 
+function onMarginSlide(el){
+  // Mover el slider de margen cancela cualquier precio fijado manualmente
+  if($('manualPrice')&&$('manualPrice').value!=='')$('manualPrice').value='';
+  setForMeState(false);
+  calc();
+}
+function onManualPriceInput(){
+  const v=$('manualPrice').value;
+  setForMeState(v!==''&&parseFloat(v)===0);
+  calc();
+}
+function togglePieceForMe(){
+  const isActive=$('btnForMe').classList.contains('is-active');
+  if(isActive){setForMeState(false);$('manualPrice').value='';}
+  else{setForMeState(true);$('manualPrice').value='0';}
+  calc();
+}
+function setForMeState(active){
+  const btn=$('btnForMe');if(!btn)return;
+  btn.classList.toggle('is-active',active);
+  btn.style.background=active?'rgba(255,122,82,.14)':'';
+  btn.style.borderColor=active?'rgba(255,122,82,.4)':'';
+  btn.style.color=active?'var(--a2)':'';
+  if($('manualPrice'))$('manualPrice').disabled=active;
+}
 function calc(){
   const s=window._calcSettings[currentCalcMode]||{};
   const h=k=>s[k]===false;
@@ -2127,7 +2159,19 @@ function calc(){
   if(typeof getCCVal==='undefined'){return;} // guard
   ccList.forEach(({id})=>{const v=getCCVal(id);cc+=v;const el=$(`cc-comp-${id}`);if(el)el.textContent=v>0?`→ ${fmt(v)} / pieza`:'';const ar=$(`cc-ar-val-${id}`);if(ar){const t=parseFloat($(`cc-t-${id}`)?.value)||0;const q=Math.max(parseFloat($(`cc-q-${id}`)?.value)||1,1);ar.textContent=fmt(t/q);}});
   const total=fc+ec+dc+mc+lc+pk+sh+dsc+cc;
-  const mg=vf('margin'),sp=total*(1+mg/100);
+  const manualVal=$('manualPrice')?.value;
+  const hasManualPrice=manualVal!==undefined&&manualVal!=='';
+  const mg=vf('margin');
+  const autoSp=total*(1+mg/100);
+  const sp=hasManualPrice?(parseFloat(manualVal)||0):autoSp;
+  if(hasManualPrice&&total>0){
+    const effMg=((sp/total)-1)*100;
+    const clamped=Math.min(Math.max(effMg,-100),500);
+    if($('margin'))$('margin').value=Math.max(clamped,10); // keep slider handle in visible range
+    if($('mgV'))$('mgV').textContent=effMg.toFixed(0)+'% 🔒';
+  }else if($('mgV')){
+    $('mgV').textContent=vf('margin')+'%';
+  }
   const pf=h('f-platformFee')?0:parseFloat($('platformFee').value)||0;
   const spf=pf<100?sp/(1-pf/100):sp;
 
@@ -2191,6 +2235,8 @@ function resetCalc(){
   if($('failureRate')){$('failureRate').value=5;$('fRV').textContent='5%';}
   if($('platformFee')){$('platformFee').value=6.5;$('pfV').textContent='6.5%';}
   if($('margin')){$('margin').value=100;$('mgV').textContent='100%';}
+  if($('manualPrice'))$('manualPrice').value='';
+  setForMeState(false);
   if($('pieceName')){$('pieceName').value='';$('pieceName').style.borderColor='';}
   if($('m-salePrice'))$('m-salePrice').value='';
   if($('m-forMe'))$('m-forMe').checked=false;
@@ -2364,7 +2410,10 @@ function openSaveModal(){
   const sel=$('m-clientSel');sel.innerHTML='<option value="">— Nuevo cliente —</option>';
   window._data.clients.forEach(c=>sel.innerHTML+=`<option value="${c.id}">${c.name} ${c.apellidos||''}</option>`);
   $('m-date').value=today();selectedFile=null;$('fileName').textContent='';$('fileUploadArea').classList.remove('has-file');
-  $('m-salePrice').value='';$('m-forMe').checked=false;
+  const calcManualPrice=$('manualPrice')?.value||'';
+  $('m-salePrice').value=calcManualPrice;
+  $('m-forMe').checked=(calcManualPrice==='0');
+  $('m-salePrice').disabled=$('m-forMe').checked;
   updateModalTotal();$('saveModal').classList.add('open');$('m-client').focus();
 }
 function toggleForMe(){
