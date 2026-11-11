@@ -326,6 +326,8 @@ tr:hover td{background:var(--s2);}
 .section-label{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin:16px 0 10px;font-family:'Inter',sans-serif;}
 @media(min-width:900px){.section-label{font-size:12px;}}
 .hint{font-size:12px;color:var(--muted);line-height:1.6;font-family:'Inter',sans-serif;}
+.eo-box{background:var(--s2);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;margin-bottom:12px;}
+.eo-box-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--soft);margin-bottom:10px;}
 @media(min-width:900px){.hint{font-size:13px;}}
 .tag{display:inline-block;padding:3px 9px;border-radius:100px;font-size:11px;background:var(--s2);color:var(--soft);font-weight:500;font-family:'Inter',sans-serif;}
 .empty{text-align:center;padding:40px 20px;color:var(--muted);}
@@ -1146,17 +1148,41 @@ tr:hover td{background:var(--s2);}
     <div class="field"><label>Email</label><input type="email" id="eo-email"></div>
   </div>
   <div class="fr">
-    <div class="field"><label>Nº piezas</label><div class="iw"><input type="number" id="eo-qty" min="1" step="1" class="hu"><span class="unit">uds</span></div></div>
+    <div class="field"><label>Nº piezas</label><div class="iw"><input type="number" id="eo-qty" min="1" step="1" class="hu" oninput="eoRecalc()"><span class="unit">uds</span></div></div>
     <div class="field"><label>Fecha</label><input type="date" id="eo-date"></div>
   </div>
-  <div class="fr">
-    <div class="field"><label>Coste/unidad (€)</label><div class="iw"><input type="number" id="eo-cost" min="0" step=".01" class="hu"><span class="unit">€</span></div></div>
-    <div class="field"><label>Precio venta/u (€)</label><div class="iw"><input type="number" id="eo-price" min="0" step=".01" class="hu"><span class="unit">€</span></div></div>
+
+  <!-- MATERIALES Y TIEMPOS (edición completa) -->
+  <div class="eo-box" id="eo-filament-section">
+    <div class="eo-box-title">🎨 Colores / filamentos <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(consumo por unidad)</span></div>
+    <div id="eo-colorLines"></div>
+    <button type="button" class="btn btn-ghost btn-sm btn-full" onclick="eoAddColorLine()">＋ Añadir color</button>
+    <div class="hint" id="eo-grams-total" style="margin-top:8px;"></div>
   </div>
-  <div class="fr">
-    <div class="field"><label>Gramos reales usados/u</label><div class="iw"><input type="number" id="eo-grams" min="0" step="1" class="hu" placeholder="Dejar vacío si no cambian"><span class="unit">g</span></div></div>
-    <div class="field"><label>ML resina reales usados/u</label><div class="iw"><input type="number" id="eo-resinml" min="0" step="1" class="hu" placeholder="Dejar vacío si no cambian"><span class="unit">ml</span></div></div>
+  <div class="eo-box" id="eo-resin-section" style="display:none">
+    <div class="eo-box-title">🧴 Resina <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(consumo por unidad)</span></div>
+    <div class="fr" style="margin-bottom:0">
+      <div class="field" style="margin-bottom:0"><label>Resina del inventario</label><select id="eo-resin-mat" onchange="eoRecalc()"></select></div>
+      <div class="field" style="margin-bottom:0"><label>ML usados/u</label><div class="iw"><input type="number" id="eo-resinml" min="0" step="1" class="hu" oninput="eoRecalc()"><span class="unit">ml</span></div></div>
+    </div>
   </div>
+  <div class="eo-box">
+    <div class="eo-box-title">⏱ Tiempos <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(por unidad)</span></div>
+    <div class="fr">
+      <div class="field"><label>Impresión</label><div class="iw"><input type="number" id="eo-print" min="0" step="1" class="hu" oninput="eoRecalc()"><span class="unit">min</span></div></div>
+      <div class="field"><label>Mano de obra activa</label><div class="iw"><input type="number" id="eo-labor" min="0" step="1" class="hu" oninput="eoRecalc()"><span class="unit">min</span></div></div>
+    </div>
+    <div class="fr" style="margin-bottom:0">
+      <div class="field" style="margin-bottom:0"><label>Postproceso</label><div class="iw"><input type="number" id="eo-post" min="0" step="1" class="hu" oninput="eoRecalc()"><span class="unit">min</span></div></div>
+      <div class="field" style="margin-bottom:0"></div>
+    </div>
+  </div>
+
+  <div class="fr">
+    <div class="field"><label>Coste/unidad (€)</label><div class="iw"><input type="number" id="eo-cost" min="0" step=".01" class="hu" oninput="eoCostTyped()"><span class="unit">€</span></div></div>
+    <div class="field"><label>Precio venta/u (€)</label><div class="iw"><input type="number" id="eo-price" min="0" step=".01" class="hu" oninput="eoUpdateHints()"><span class="unit">€</span></div></div>
+  </div>
+  <div class="hint" id="eo-cost-hint" style="margin:-4px 0 12px;"></div>
   <div class="fr">
     <div class="field"><label>Nº Presupuesto</label><input type="text" id="eo-budget"></div>
     <div class="field"><label>Nº Factura</label><input type="text" id="eo-invoice"></div>
@@ -2711,7 +2737,7 @@ function viewSavedInvoice(id){
   if(!o||!o.invoiceHTML){toast('Factura no encontrada','red');return;}
   displayPDF(o.invoiceHTML);
 }
-function openEditOrder(id){const o=window._data.orders.find(x=>x.id===id);if(!o)return;$('eo-id').value=id;$('eo-code-display').textContent=o.code||'';$('eo-piece').value=o.pieceName||'';$('eo-status').value=o.status||'solicitud';$('eo-client').value=o.client||'';$('eo-apellidos').value=o.apellidos||'';$('eo-phone').value=o.phone||'';$('eo-email').value=o.email||'';$('eo-qty').value=o.qty||1;$('eo-date').value=o.date||today();$('eo-cost').value=o.costPerPiece||0;$('eo-price').value=o.pricePerPiece||0;$('eo-budget').value=o.budgetNum||'';$('eo-invoice').value=o.invoiceNum||'';$('eo-notes').value=o.notes||'';$('eo-grams').value='';$('eo-resinml').value='';
+function openEditOrder(id){const o=window._data.orders.find(x=>x.id===id);if(!o)return;$('eo-id').value=id;$('eo-code-display').textContent=o.code||'';$('eo-piece').value=o.pieceName||'';$('eo-status').value=o.status||'solicitud';$('eo-client').value=o.client||'';$('eo-apellidos').value=o.apellidos||'';$('eo-phone').value=o.phone||'';$('eo-email').value=o.email||'';$('eo-qty').value=o.qty||1;$('eo-date').value=o.date||today();$('eo-cost').value=o.costPerPiece||0;$('eo-price').value=o.pricePerPiece||0;$('eo-budget').value=o.budgetNum||'';$('eo-invoice').value=o.invoiceNum||'';$('eo-notes').value=o.notes||'';eoInit(o);
   // Mostrar archivo actual si existe
   const fc=$('eo-file-current');
   if(fc){if(o.fileUrl&&o.fileName){fc.innerHTML=`📁 <a href="${o.fileUrl}" target="_blank" style="color:var(--accent)">${o.fileName}</a> <span style="color:var(--muted)">(guardado en la nube)</span>`;}else{fc.textContent='Sin archivo adjunto.';}}
@@ -2721,47 +2747,183 @@ function openEditOrder(id){const o=window._data.orders.find(x=>x.id===id);if(!o)
 let _editSelectedFile=null;
 function handleEditFileSelect(input){_editSelectedFile=input.files[0];if(_editSelectedFile){$('eo-file-new-name').textContent=`📎 ${_editSelectedFile.name}`;}}
 
-async function updateOrder(){const id=$('eo-id').value;if(!id)return;const pn=$('eo-piece').value.trim();if(!pn){toast('Nombre obligatorio','red');return;}const qty=Math.max(parseInt($('eo-qty').value)||1,1);const price=parseFloat($('eo-price').value)||0;const data={pieceName:pn,client:$('eo-client').value.trim(),apellidos:$('eo-apellidos').value.trim(),phone:$('eo-phone').value.trim(),email:$('eo-email').value.trim(),qty,date:$('eo-date').value,status:$('eo-status').value,budgetNum:$('eo-budget').value.trim(),invoiceNum:$('eo-invoice').value.trim(),costPerPiece:parseFloat($('eo-cost').value)||0,pricePerPiece:price,totalOrder:fmtR(price*qty),notes:$('eo-notes').value.trim()};
+/* ════ EDICIÓN COMPLETA DE PEDIDO: colores, tiempos y recálculo de coste ════ */
+let _eo={order:null,lines:[],origLines:[],baseCost:0,seq:0,origUnlinked:0};
+function eoInventoryOptions(selId){
+  return (window._data.materials||[]).filter(m=>m.cat==='filamento').map(m=>`<option value="${m.id}" ${m.id===selId?'selected':''}>${m.type||'?'}${m.color?' · '+m.color:''} — ${m.stock||0}g</option>`).join('');
+}
+function eoResinOptions(selId){
+  const bottles=(window._data.materials||[]).filter(m=>m.cat==='resina');
+  if(!bottles.length)return'<option value="">— Sin resinas en inventario —</option>';
+  return bottles.map(m=>`<option value="${m.id}" ${m.id===selId?'selected':''}>${m.type||'?'}${m.color?' · '+m.color:''} — ${m.stock||0}ml</option>`).join('');
+}
+function eoInit(o){
+  const isResin=o.projectType==='resina';
+  // Líneas de color actuales (multicolor o legado de un solo carrete)
+  let src=[];
+  if(!isResin){
+    if(o.filamentColors&&o.filamentColors.length)src=o.filamentColors.map(c=>({materialId:c.materialId||'',grams:c.gramsPerUnit||0}));
+    else if(o.filamentUsed&&(o.filamentUsed.materialId||o.filamentUsed.gramsPerUnit))src=[{materialId:o.filamentUsed.materialId||'',grams:o.filamentUsed.gramsPerUnit||0}];
+  }
+  _eo={order:o,seq:0,lines:[],origLines:[],baseCost:o.costPerPiece||0,origUnlinked:0};
+  src.forEach(l=>_eo.lines.push({id:++_eo.seq,materialId:l.materialId,grams:l.grams}));
+  _eo.origLines=_eo.lines.map(l=>({materialId:l.materialId,grams:l.grams}));
+  _eo.origUnlinked=_eo.lines.filter(l=>!l.materialId&&l.grams>0).length;
+  $('eo-filament-section').style.display=isResin?'none':'';
+  $('eo-resin-section').style.display=isResin?'':'none';
+  if(isResin){
+    $('eo-resin-mat').innerHTML=eoResinOptions(o.resinUsed?.materialId||'');
+    $('eo-resinml').value=o.resinUsed?.mlPerUnit||0;
+  }
+  $('eo-print').value=o.printMinutes||0;
+  $('eo-labor').value=o.laborMinutes||0;
+  $('eo-post').value=o.postMinutes||0;
+  eoRenderColorLines();
+}
+function eoAddColorLine(){_eo.lines.push({id:++_eo.seq,materialId:'',grams:0});eoRenderColorLines();}
+function eoRemoveColorLine(id){_eo.lines=_eo.lines.filter(l=>l.id!==id);eoRenderColorLines();}
+function eoUpdateLine(id,field,val){const l=_eo.lines.find(x=>x.id===id);if(!l)return;l[field]=val;eoRecalc();}
+function eoRenderColorLines(){
+  const c=$('eo-colorLines');if(!c)return;
+  if(!_eo.lines.length){
+    c.innerHTML='<div style="text-align:center;padding:8px 0 12px;color:var(--muted);font-size:12px;">Sin colores registrados. Pulsa <strong>＋ Añadir color</strong>.</div>';
+    eoRecalc();return;
+  }
+  c.innerHTML=_eo.lines.map((l,i)=>`
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-size:10px;font-weight:700;color:var(--muted);">COLOR ${i+1}</span>
+        <button type="button" onclick="eoRemoveColorLine(${l.id})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;line-height:1;" title="Quitar este color">🗑</button>
+      </div>
+      <select onchange="eoUpdateLine(${l.id},'materialId',this.value)" style="width:100%;margin-bottom:8px;">
+        <option value="">— Selecciona carrete —</option>${eoInventoryOptions(l.materialId)}
+      </select>
+      <div style="display:flex;align-items:flex-end;gap:8px;">
+        <div style="flex:1;">
+          <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px;">GRAMOS POR UNIDAD</label>
+          <div class="iw"><input type="number" value="${l.grams||''}" min="0" step="0.1" class="hu" placeholder="0" oninput="eoUpdateLine(${l.id},'grams',parseFloat(this.value)||0)"><span class="unit">g</span></div>
+        </div>
+        <div style="text-align:right;min-width:64px;padding-bottom:10px;"><div style="font-size:12px;font-weight:700;color:var(--a2)" id="eo-cl-cost-${l.id}">0,00 €</div></div>
+      </div>
+    </div>`).join('');
+  eoRecalc();
+}
+function eoLineCost(l){return getColorLineCost({materialId:l.materialId,grams:l.grams||0});}
+// Calcula cuánto cambia el coste por unidad respecto a lo guardado (delta), usando como referencia el desglose original
+function eoCompute(){
+  const o=_eo.order;const r={dfc:0,dec:0,ddc:0,dmc:0,dlc:0,total:0};
+  if(!o)return r;
+  const b=o.breakdown||{};
+  if(o.projectType==='resina'){
+    const mats=window._data.materials||[];
+    const perMl=m=>(m&&m.spool&&m.price)?m.price/m.spool:0;
+    const newM=mats.find(m=>m.id===($('eo-resin-mat')?.value||''));
+    const oldM=mats.find(m=>m.id===(o.resinUsed?.materialId||''));
+    r.dfc=(parseFloat($('eo-resinml')?.value)||0)*perMl(newM)-(o.resinUsed?.mlPerUnit||0)*perMl(oldM);
+  }else{
+    const oldRaw=_eo.origLines.reduce((a,l)=>a+eoLineCost(l),0);
+    const newRaw=_eo.lines.reduce((a,l)=>a+eoLineCost(l),0);
+    // Si el pedido original llevaba % de fallos, se conserva (fc guardado / coste bruto); fuera de rango razonable => 1
+    let ratio=(oldRaw>0&&(b.fc||0)>0)?b.fc/oldRaw:1;
+    if(!(ratio>=1&&ratio<=1.5))ratio=1;
+    r.dfc=(newRaw-oldRaw)*ratio;
+  }
+  // Electricidad, amortización y mantenimiento: proporcionales al tiempo de impresión
+  const oldPrint=o.printMinutes||0,newPrint=parseFloat($('eo-print')?.value)||0;
+  if(oldPrint>0){const f=newPrint/oldPrint-1;r.dec=(b.ec||0)*f;r.ddc=(b.dc||0)*f;r.dmc=(b.mc||0)*f;}
+  // Mano de obra: proporcional a (activa + postproceso)
+  const oldLab=(o.laborMinutes||0)+(o.postMinutes||0);
+  const newLab=(parseFloat($('eo-labor')?.value)||0)+(parseFloat($('eo-post')?.value)||0);
+  if(oldLab>0)r.dlc=(b.lc||0)*(newLab/oldLab-1);
+  r.total=r.dfc+r.dec+r.ddc+r.dmc+r.dlc;
+  return r;
+}
+function eoRecalc(){
+  if(!_eo.order)return;
+  const d=eoCompute();
+  _eo.lines.forEach(l=>{const el=$('eo-cl-cost-'+l.id);if(el)el.textContent=fmt(eoLineCost(l));});
+  $('eo-cost').value=Math.max(fmtR(_eo.baseCost+d.total),0);
+  const qty=Math.max(parseInt($('eo-qty').value)||1,1);
+  const g=_eo.lines.reduce((a,l)=>a+(l.grams||0),0);
+  const gt=$('eo-grams-total');
+  if(gt)gt.textContent=_eo.lines.length?`⚖️ Total: ${fmtR(g)} g por unidad · ${fmtR(g*qty)} g en el pedido (${qty} ud)`:'';
+  eoUpdateHints(d);
+}
+// Si Carlos escribe el coste a mano, se respeta y los cambios posteriores se suman encima
+function eoCostTyped(){
+  if(!_eo.order)return;
+  _eo.baseCost=(parseFloat($('eo-cost').value)||0)-eoCompute().total;
+  eoUpdateHints();
+}
+function eoUpdateHints(d){
+  if(!_eo.order)return;
+  d=d||eoCompute();
+  const cost=parseFloat($('eo-cost').value)||0,price=parseFloat($('eo-price').value)||0;
+  const qty=Math.max(parseInt($('eo-qty').value)||1,1);
+  const parts=[];
+  if(Math.abs(d.total)>=0.005)parts.push(`Coste recalculado: ${d.total>0?'+':'−'}${fmt(Math.abs(d.total))}/ud sobre lo guardado`);
+  parts.push(`Beneficio: ${fmt(price-cost)}/ud · ${fmt((price-cost)*qty)} en el pedido`);
+  if(!(_eo.order.printMinutes>0)&&(parseFloat($('eo-print').value)||0)>0)parts.push('Sin tiempo previo de referencia: ajusta el coste a mano si hace falta');
+  $('eo-cost-hint').textContent=parts.join(' · ');
+}
+// Consumo total del pedido por material {materialId: cantidad} (g de filamento / ml de resina)
+function orderConsumption(order){
+  const qty=order.qty||1,map={};
+  const colors=order.filamentColors&&order.filamentColors.length?order.filamentColors:
+    (order.filamentUsed?.materialId?[{materialId:order.filamentUsed.materialId,gramsPerUnit:order.filamentUsed.gramsPerUnit||0}]:[]);
+  colors.forEach(c=>{if(c.materialId&&c.gramsPerUnit)map[c.materialId]=fmtR((map[c.materialId]||0)+c.gramsPerUnit*qty);});
+  if(order.resinUsed?.materialId&&order.resinUsed?.mlPerUnit)map[order.resinUsed.materialId]=fmtR((map[order.resinUsed.materialId]||0)+order.resinUsed.mlPerUnit*qty);
+  return map;
+}
+// Pedido ya descontado y que sigue en producción: ajusta solo la diferencia entre lo antiguo y lo nuevo
+async function reconcileStock(oldOrder,newOrder){
+  const oldC=orderConsumption(oldOrder),newC=orderConsumption(newOrder);
+  const changes=[];
+  for(const mid of new Set([...Object.keys(oldC),...Object.keys(newC)])){
+    const diff=fmtR((newC[mid]||0)-(oldC[mid]||0));
+    if(!diff)continue;
+    const mat=(window._data.materials||[]).find(m=>m.id===mid);if(!mat)continue;
+    const newStock=Math.max((mat.stock||0)-diff,0);
+    if(window.dbOps)await window.dbOps.updateMaterial(mat.id,{stock:fmtR(newStock)});
+    mat.stock=fmtR(newStock);
+    changes.push(`${mat.type||''}${mat.color?' '+mat.color:''} ${diff>0?'−':'+'}${Math.abs(diff)}${mat.cat==='resina'?'ml':'g'}`);
+  }
+  if(changes.length)toast('Stock ajustado: '+changes.join(' · '),'green');
+}
+async function updateOrder(){
+  const id=$('eo-id').value;if(!id)return;
+  const pn=$('eo-piece').value.trim();if(!pn){toast('Nombre obligatorio','red');return;}
   const existing=window._data.orders.find(o=>o.id===id);
-  // Handle grams correction (pieza fallida)
-  const newGramsVal=$('eo-grams').value;
-  if(newGramsVal!==''&&existing&&existing.filamentUsed){
-    const newGramsPerUnit=parseFloat(newGramsVal)||0;
-    const newTotalGrams=fmtR(newGramsPerUnit*qty);
-    // If stock was already deducted, adjust the difference in inventory
-    if(existing.stockDeducted&&existing.filamentUsed.materialId){
-      const mat=(window._data.materials||[]).find(m=>m.id===existing.filamentUsed.materialId);
-      if(mat){
-        const oldTotal=existing.filamentUsed.totalGrams||0;
-        const diff=newTotalGrams-oldTotal; // positive = used more, negative = used less (returned to stock)
-        const newStock=Math.max((mat.stock||0)-diff,0);
-        if(window.dbOps)await window.dbOps.updateMaterial(mat.id,{stock:fmtR(newStock)});
-        toast(`Stock ajustado: ${diff>=0?'-':'+'} ${Math.abs(diff)}g`,'green');
+  const qty=Math.max(parseInt($('eo-qty').value)||1,1);
+  const price=parseFloat($('eo-price').value)||0;
+  const data={pieceName:pn,client:$('eo-client').value.trim(),apellidos:$('eo-apellidos').value.trim(),phone:$('eo-phone').value.trim(),email:$('eo-email').value.trim(),qty,date:$('eo-date').value,status:$('eo-status').value,budgetNum:$('eo-budget').value.trim(),invoiceNum:$('eo-invoice').value.trim(),costPerPiece:parseFloat($('eo-cost').value)||0,pricePerPiece:price,totalOrder:fmtR(price*qty),notes:$('eo-notes').value.trim(),
+    printMinutes:parseFloat($('eo-print').value)||0,laborMinutes:parseFloat($('eo-labor').value)||0,postMinutes:parseFloat($('eo-post').value)||0};
+  // Materiales (colores / resina) y desglose de costes
+  if(existing&&_eo.order&&_eo.order.id===id){
+    if(existing.projectType==='resina'){
+      const ml=parseFloat($('eo-resinml').value)||0;
+      data.resinUsed={materialId:$('eo-resin-mat').value||null,mlPerUnit:ml,totalMl:fmtR(ml*qty)};
+    }else{
+      const lines=_eo.lines.filter(l=>(l.grams||0)>0);
+      const totalG=lines.reduce((a,l)=>a+l.grams,0);
+      data.filamentColors=lines.map(l=>({materialId:l.materialId||'',gramsPerUnit:fmtR(l.grams),totalGrams:fmtR(l.grams*qty)}));
+      data.filamentUsed=lines.length?{materialId:lines[0].materialId||null,gramsPerUnit:fmtR(totalG),totalGrams:fmtR(totalG*qty)}:{materialId:null,gramsPerUnit:0,totalGrams:0};
+      if(lines.filter(l=>!l.materialId).length>_eo.origUnlinked)toast('⚠️ Hay colores sin carrete: no descontarán stock','red');
+    }
+    if(existing.breakdown){
+      const d=eoCompute(),b=existing.breakdown;
+      if(Math.abs(d.total)>0.00001){
+        data.breakdown={...b,fc:fmtR(Math.max((b.fc||0)+d.dfc,0)),ec:fmtR(Math.max((b.ec||0)+d.dec,0)),dc:fmtR(Math.max((b.dc||0)+d.ddc,0)),mc:fmtR(Math.max((b.mc||0)+d.dmc,0)),lc:fmtR(Math.max((b.lc||0)+d.dlc,0))};
       }
     }
-    data.filamentUsed={...existing.filamentUsed,gramsPerUnit:newGramsPerUnit,totalGrams:newTotalGrams};
   }
-  // Handle resin ml correction (pieza fallida)
-  const newMlVal=$('eo-resinml').value;
-  if(newMlVal!==''&&existing&&existing.resinUsed&&existing.resinUsed.materialId){
-    const newMlPerUnit=parseFloat(newMlVal)||0;
-    const newTotalMl=fmtR(newMlPerUnit*qty);
-    if(existing.stockDeducted){
-      const mat=(window._data.materials||[]).find(m=>m.id===existing.resinUsed.materialId);
-      if(mat){
-        const oldTotal=existing.resinUsed.totalMl||0;
-        const diff=newTotalMl-oldTotal;
-        const newStock=Math.max((mat.stock||0)-diff,0);
-        if(window.dbOps)await window.dbOps.updateMaterial(mat.id,{stock:fmtR(newStock)});
-        toast(`Stock resina ajustado: ${diff>=0?'-':'+'} ${Math.abs(diff)}ml`,'green');
-      }
-    }
-    data.resinUsed={...existing.resinUsed,mlPerUnit:newMlPerUnit,totalMl:newTotalMl};
-  }
-  if(existing&&!existing.stockDeducted&&PRODUCTION_STATUSES.includes(data.status)){
-    if(await deductFilamentStock({...existing,...data,qty}))data.stockDeducted=true;
-  }else if(existing&&existing.stockDeducted&&!PRODUCTION_STATUSES.includes(data.status)){
-    if(await restoreFilamentStock({...existing,...(data.filamentUsed?{filamentUsed:data.filamentUsed}:{}),...(data.resinUsed?{resinUsed:data.resinUsed}:{})}))data.stockDeducted=false;
+  // Stock: entra en producción => descuenta lo nuevo; sale => devuelve lo descontado; sigue en producción => ajusta la diferencia
+  if(existing){
+    const merged={...existing,...data};
+    const wasDeducted=!!existing.stockDeducted,inProd=PRODUCTION_STATUSES.includes(data.status);
+    if(!wasDeducted&&inProd){if(await deductFilamentStock(merged))data.stockDeducted=true;}
+    else if(wasDeducted&&!inProd){if(await restoreFilamentStock(existing))data.stockDeducted=false;}
+    else if(wasDeducted&&inProd){await reconcileStock(existing,merged);}
   }
   if(window.dbOps)await window.dbOps.updateOrder(id,data);
   // Subir nuevo archivo si se seleccionó uno
