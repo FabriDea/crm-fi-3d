@@ -2476,37 +2476,64 @@ async function buildOrderObject(){
   const salePrice=customPriceVal!==''?parseFloat(customPriceVal)||0:C.spf;
   return{pieceName:pn,code,client:clientName,apellidos:$('m-apellidos').value.trim(),phone,email:$('m-email').value.trim(),qty:q,status:$('m-status').value,date:$('m-date').value,notes:$('m-notes').value.trim(),fileName:selectedFile?selectedFile.name:'',costPerPiece:fmtR(C.total),pricePerPiece:fmtR(salePrice),priceWithFee:fmtR(salePrice),totalOrder:fmtR(salePrice*q),margin:C.mg,platformFee:C.pf,budgetNum:'',invoiceNum:'',projectType:currentProjectType,filamentUsed,filamentColors,resinUsed,printMinutes:vf('printHours'),laborMinutes:vf('laborHours'),postMinutes:vf('postHours'),stockDeducted:false,breakdown:{fc:fmtR(C.fc),ec:fmtR(C.ec),dc:fmtR(C.dc),mc:fmtR(C.mc),lc:fmtR(C.lc),pk:fmtR(C.pk),sh:fmtR(C.sh),dsc:fmtR(C.dsc||0),cc:fmtR(C.cc)}};
 }
+let _savingOrder=false;
+// Tras guardar: vuelve a la lista de Pedidos (sin filtros que oculten el pedido nuevo) y sube al inicio
+function goToOrdersAfterSave(){
+  orderFilter='all';orderMatFilter='all';
+  if($('orderStatusSel'))$('orderStatusSel').value='all';
+  if($('orderMatSel'))$('orderMatSel').value='all';
+  if($('orderSearch'))$('orderSearch').value='';
+  setOrdersTab('orders');
+  go('orders');
+  const m=$('main');if(m)m.scrollTop=0;
+}
 async function saveOrder(){
-  const order=await buildOrderObject();if(!order)return;
-  if(PRODUCTION_STATUSES.includes(order.status)){if(await deductFilamentStock(order))order.stockDeducted=true;}
-  let docRef;
-  if(window.dbOps) docRef=await window.dbOps.addOrder(order);
-  // Subir archivo a Storage si hay uno seleccionado
-  if(selectedFile && docRef && window.uploadFileToStorage){
-    try{
-      const pc=$('uploadProgressContainer');if(pc)pc.style.display='block';
-      const fileData=await window.uploadFileToStorage(selectedFile, docRef.id);
-      await window.dbOps.updateOrder(docRef.id,{fileUrl:fileData.url,filePath:fileData.path,fileName:fileData.name,fileSize:fileData.size});
-      const fi=$('fileStorageInfo');if(fi)fi.style.display='block';
-    }catch(e){toast('⚠️ Pedido guardado pero el archivo no se subió','red');}
-  }
-  closeModal('saveModal');clearOrderForm();toast(`✓ Pedido ${order.code} guardado`,'purple');
+  if(_savingOrder)return; // evita duplicados por doble toque
+  _savingOrder=true;
+  try{
+    const order=await buildOrderObject();if(!order)return;
+    if(PRODUCTION_STATUSES.includes(order.status)){if(await deductFilamentStock(order))order.stockDeducted=true;}
+    let docRef;
+    if(window.dbOps) docRef=await window.dbOps.addOrder(order);
+    // Subir archivo a Storage si hay uno seleccionado
+    if(selectedFile && docRef && window.uploadFileToStorage){
+      try{
+        const pc=$('uploadProgressContainer');if(pc)pc.style.display='block';
+        const fileData=await window.uploadFileToStorage(selectedFile, docRef.id);
+        await window.dbOps.updateOrder(docRef.id,{fileUrl:fileData.url,filePath:fileData.path,fileName:fileData.name,fileSize:fileData.size});
+        const fi=$('fileStorageInfo');if(fi)fi.style.display='block';
+      }catch(e){toast('⚠️ Pedido guardado pero el archivo no se subió','red');}
+    }
+    closeModal('saveModal');clearOrderForm();toast(`✓ Pedido ${order.code} guardado`,'purple');
+    goToOrdersAfterSave();
+  }catch(e){
+    console.error('Error guardando pedido:',e);
+    toast('⚠️ No se pudo guardar el pedido. Inténtalo de nuevo.','red');
+  }finally{_savingOrder=false;}
 }
 async function saveOrderAndGenerate(type){
-  const order=await buildOrderObject();if(!order)return;
-  if(PRODUCTION_STATUSES.includes(order.status)){if(await deductFilamentStock(order))order.stockDeducted=true;}
-  const docCode=await getNextCode(type);
-  if(type==='budget')order.budgetNum=docCode;else order.invoiceNum=docCode;
-  let docRef;
-  if(window.dbOps) docRef=await window.dbOps.addOrder(order);
-  if(selectedFile && docRef && window.uploadFileToStorage){
-    try{
-      const pc=$('uploadProgressContainer');if(pc)pc.style.display='block';
-      const fileData=await window.uploadFileToStorage(selectedFile, docRef.id);
-      await window.dbOps.updateOrder(docRef.id,{fileUrl:fileData.url,filePath:fileData.path,fileName:fileData.name,fileSize:fileData.size});
-    }catch(e){console.warn('File upload error:',e);}
-  }
-  closeModal('saveModal');clearOrderForm();toast(`✓ Pedido ${order.code} guardado`,'purple');setTimeout(()=>generatePDF(type,order),500);
+  if(_savingOrder)return;
+  _savingOrder=true;
+  try{
+    const order=await buildOrderObject();if(!order)return;
+    if(PRODUCTION_STATUSES.includes(order.status)){if(await deductFilamentStock(order))order.stockDeducted=true;}
+    const docCode=await getNextCode(type);
+    if(type==='budget')order.budgetNum=docCode;else order.invoiceNum=docCode;
+    let docRef;
+    if(window.dbOps) docRef=await window.dbOps.addOrder(order);
+    if(selectedFile && docRef && window.uploadFileToStorage){
+      try{
+        const pc=$('uploadProgressContainer');if(pc)pc.style.display='block';
+        const fileData=await window.uploadFileToStorage(selectedFile, docRef.id);
+        await window.dbOps.updateOrder(docRef.id,{fileUrl:fileData.url,filePath:fileData.path,fileName:fileData.name,fileSize:fileData.size});
+      }catch(e){console.warn('File upload error:',e);}
+    }
+    closeModal('saveModal');clearOrderForm();toast(`✓ Pedido ${order.code} guardado`,'purple');setTimeout(()=>generatePDF(type,order),500);
+    goToOrdersAfterSave();
+  }catch(e){
+    console.error('Error guardando pedido:',e);
+    toast('⚠️ No se pudo guardar el pedido. Inténtalo de nuevo.','red');
+  }finally{_savingOrder=false;}
 }
 function clearOrderForm(){['m-client','m-apellidos','m-phone','m-email','m-notes'].forEach(f=>{if($(f)){$(f).value='';$(f).classList.remove('error');}});$('m-qty').value=1;selectedFile=null;}
 
